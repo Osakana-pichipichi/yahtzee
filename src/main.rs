@@ -2,6 +2,7 @@ use enum_iterator::*;
 
 mod hand;
 mod scoring;
+mod score_table;
 use hand::*;
 use scoring::*;
 
