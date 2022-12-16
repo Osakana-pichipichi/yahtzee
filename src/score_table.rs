@@ -41,20 +41,20 @@ impl ScoreTable {
         }
     }
 
-    pub fn get_score(&self, b: &Boxes) -> u32 {
-        self.table.get(b).unwrap().get_score()
+    pub fn get_score(&self, b: Boxes) -> u32 {
+        self.table.get(&b).unwrap().get_score()
     }
 
-    pub fn is_filled(&self, b: &Boxes) -> bool {
-        self.table.get(b).unwrap().is_filled()
+    pub fn is_filled(&self, b: Boxes) -> bool {
+        self.table.get(&b).unwrap().is_filled()
     }
 
-    pub fn confirm_score(&mut self, b: &Boxes, score: u32) {
-        self.table.get_mut(b).unwrap().fill(score);
+    pub fn confirm_score(&mut self, b: Boxes, score: u32) {
+        self.table.get_mut(&b).unwrap().fill(score);
     }
 
     pub fn remaining_boxes(&self) -> Vec<Boxes> {
-        all::<Boxes>().filter(|b| self.is_filled(b)).collect()
+        all::<Boxes>().filter(|&b| self.is_filled(b)).collect()
     }
 }
 
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_score_table() {
         let mut score_table = ScoreTable::new();
-        let b = &Boxes::Chance;
+        let b = Boxes::Chance;
         let score: u32 = 21;
 
         assert!(!score_table.is_filled(b));

@@ -196,36 +196,33 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         .enumerate()
         .map(|(bid, b)| {
             Row::new(
-                vec![Cell::from(box_name(&b).to_string())]
-                    .into_iter()
-                    .chain(
-                        (0..app.num_players)
-                            .map(|pid| {
-                                let st = &app.scores[pid];
-                                let text = if st.is_filled(&b) || pid == app.current_play.player_id
-                                {
-                                    format!("{}", st.get_score(&b))
-                                } else {
-                                    format!("")
-                                };
-                                let cell = Cell::from(text);
-                                match app.cursor_pos {
-                                    CursorPos::Table(pos) => {
-                                        if bid == pos && pid == app.current_play.player_id {
-                                            cell.style(
-                                                Style::default().fg(Color::Yellow).bg(Color::White),
-                                            )
-                                        } else {
-                                            cell.style(Style::default().fg(Color::Yellow))
-                                        }
+                vec![Cell::from(box_name(b).to_string())].into_iter().chain(
+                    (0..app.num_players)
+                        .map(|pid| {
+                            let st = &app.scores[pid];
+                            let text = if st.is_filled(b) || pid == app.current_play.player_id {
+                                format!("{}", st.get_score(b))
+                            } else {
+                                format!("")
+                            };
+                            let cell = Cell::from(text);
+                            match app.cursor_pos {
+                                CursorPos::Table(pos) => {
+                                    if bid == pos && pid == app.current_play.player_id {
+                                        cell.style(
+                                            Style::default().fg(Color::Yellow).bg(Color::White),
+                                        )
+                                    } else {
+                                        cell.style(Style::default().fg(Color::Yellow))
                                     }
-
-                                    _ => cell.style(Style::default().fg(Color::Yellow)),
                                 }
-                            })
-                            .collect::<Vec<Cell>>()
-                            .into_iter(),
-                    ),
+
+                                _ => cell.style(Style::default().fg(Color::Yellow)),
+                            }
+                        })
+                        .collect::<Vec<Cell>>()
+                        .into_iter(),
+                ),
             )
         })
         .collect::<Vec<Row>>();
