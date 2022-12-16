@@ -1,40 +1,61 @@
-use enum_iterator::*;
-
+mod app;
+mod events;
 mod hand;
 mod score_table;
 mod scoring;
-use hand::*;
-use scoring::*;
+mod ui;
 
-fn main() {
-    let mut h: Hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
-    println!("Hand: {:?}", h.get_dice());
+use crate::app::{App, AppReturn};
+use crate::events::{Events, InputEvent};
+use crate::ui::draw_play_ui;
+use anyhow::Result;
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use std::{cell::RefCell, io, rc::Rc, time::Duration};
+use tui::{backend::CrosstermBackend, Terminal};
 
-    println!(" --------- 1st ---------- ");
-    for b in all::<Boxes>() {
-        let score = scoring::scoring(&b, h.get_dice());
-        println!("{}: {}", box_name(&b), score);
+pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let tick_rate = Duration::from_millis(30);
+    let events = Events::new(tick_rate);
+
+    loop {
+        let mut app = app.borrow_mut();
+
+        terminal.draw(|f| draw_play_ui(f, &app))?;
+
+        let result = match events.next()? {
+            InputEvent::Input(key) => app.do_action(key),
+            _ => AppReturn::Continue,
+        };
+
+        if result == AppReturn::Exit {
+            break;
+        }
     }
 
-    println!("\n --------- 2nd ---------- ");
-    let r: &[u32] = h.get_dice();
-    let r: &[u32; 3] = &[r[0], r[1], r[3]];
-    h.remove_dice(r);
-    h.add_dice(&Hand::new_with_random_n_dice(r.len()));
-    println!("Hand: {:?}", h.get_dice());
-    for b in all::<Boxes>() {
-        let score = scoring::scoring(&b, h.get_dice());
-        println!("{}: {}", box_name(&b), score);
-    }
+    // restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
-    println!("\n --------- 3nd ---------- ");
-    let r: &[u32] = h.get_dice();
-    let r: &[u32; 2] = &[r[2], r[1]];
-    h.remove_dice(r);
-    h.add_dice(&Hand::new_with_random_n_dice(r.len()));
-    println!("Hand: {:?}", h.get_dice());
-    for b in all::<Boxes>() {
-        let score = scoring::scoring(&b, h.get_dice());
-        println!("{}: {}", box_name(&b), score);
-    }
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let app = Rc::new(RefCell::new(App::new(2)));
+    start_ui(app)?;
+    Ok(())
 }
