@@ -51,28 +51,34 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
         .split(f.size());
-    let play_chunks = Layout::default()
+
+    draw_playing_ground(f, app, chunks[0]);
+    draw_score_table(f, app, chunks[1]);
+}
+
+fn draw_playing_ground<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(20),
             Constraint::Percentage(50),
             Constraint::Percentage(30),
         ])
-        .split(chunks[0]);
+        .split(chunk);
 
-    /* Role block */
-    let role_block = Block::default().title("Role").borders(Borders::ALL);
-    f.render_widget(role_block, play_chunks[0]);
+    draw_role_block(f, app, chunks[0]);
+    draw_hand_block(f, app, chunks[1]);
+    draw_dust_block(f, app, chunks[2]);
+}
+
+fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let block = Block::default().title("Role").borders(Borders::ALL);
+    f.render_widget(block, chunk);
 
     let role_button_chunk = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(100)])
-        .split(Rect {
-            x: play_chunks[0].x + (play_chunks[0].width - 13) / 2,
-            y: play_chunks[0].y + (play_chunks[0].height - 3) / 2,
-            width: 13,
-            height: 3,
-        });
+        .split(create_centerd_rect(chunk, 13, 3));
     let text = Paragraph::new(Spans::from(Span::styled("Role!", Style::default())))
         .block(Block::default().borders(Borders::ALL))
         .style(match app.cursor_pos {
@@ -81,12 +87,13 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         })
         .alignment(Alignment::Center);
     f.render_widget(text, role_button_chunk[0]);
+}
 
-    /* Dice Block */
-    let current_dice_block = Block::default().title("Dice").borders(Borders::ALL);
-    f.render_widget(current_dice_block, play_chunks[1]);
+fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let block = Block::default().title("Dice").borders(Borders::ALL);
+    f.render_widget(block, chunk);
 
-    let dice_chunk = Layout::default()
+    let dice_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(7),
@@ -99,12 +106,8 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             Constraint::Length(1),
             Constraint::Length(7),
         ])
-        .split(Rect {
-            x: play_chunks[1].x + (play_chunks[1].width - 39) / 2,
-            y: play_chunks[1].y + (play_chunks[1].height - 5) / 2,
-            width: 39,
-            height: 5,
-        });
+        .split(create_centerd_rect(chunk, 39, 5));
+
     for i in 0..5 {
         let text = if app.current_play.is_held[i] {
             vec![
@@ -133,14 +136,15 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 _ => Style::default(),
             })
             .alignment(Alignment::Center);
-        f.render_widget(text, dice_chunk[2 * i]);
+        f.render_widget(text, dice_chunks[2 * i]);
     }
+}
 
-    /* Dust Block */
-    let dust_block = Block::default().title("Dust").borders(Borders::ALL);
-    f.render_widget(dust_block, play_chunks[2]);
+fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let block = Block::default().title("Dust").borders(Borders::ALL);
+    f.render_widget(block, chunk);
 
-    let dice_chunk = Layout::default()
+    let dice_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(7),
@@ -153,12 +157,8 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             Constraint::Length(1),
             Constraint::Length(7),
         ])
-        .split(Rect {
-            x: play_chunks[2].x + (play_chunks[2].width - 39) / 2,
-            y: play_chunks[2].y + (play_chunks[2].height - 5) / 2,
-            width: 39,
-            height: 5,
-        });
+        .split(create_centerd_rect(chunk, 39, 5));
+
     for i in 0..5 {
         let text = if !app.current_play.is_held[i] {
             vec![
@@ -187,10 +187,11 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 _ => Style::default(),
             })
             .alignment(Alignment::Center);
-        f.render_widget(text, dice_chunk[2 * i]);
+        f.render_widget(text, dice_chunks[2 * i]);
     }
+}
 
-    /* Table block */
+fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let score_rows = all::<Boxes>()
         .enumerate()
         .map(|(bid, b)| {
@@ -257,5 +258,14 @@ pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         )
         .highlight_symbol(">>");
 
-    f.render_widget(score_block, chunks[1]);
+    f.render_widget(score_block, chunk);
+}
+
+fn create_centerd_rect(base_rect: Rect, width: u16, height: u16) -> Rect {
+    Rect {
+        x: base_rect.x + (base_rect.width - width) / 2,
+        y: base_rect.y + (base_rect.height - height) / 2,
+        width: width,
+        height: height,
+    }
 }
