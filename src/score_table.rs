@@ -18,8 +18,12 @@ impl Record {
     }
 
     fn fill(&mut self, score: u32) {
-        self.score = score;
-        self.filled = true;
+        if !self.is_filled() {
+            self.score = score;
+            self.filled = true;
+        } else {
+            panic!("The record to be filled is already filled.");
+        }
     }
 
     fn get_score(&self) -> u32 {
