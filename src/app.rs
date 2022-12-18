@@ -28,7 +28,7 @@ pub struct Play {
 impl Play {
     pub fn new(player_id: usize) -> Self {
         Self {
-            player_id: player_id,
+            player_id,
             hand: Hand::new_with_random_n_dice(0),
             is_held: [true; 5],
             roll_count: 0,
@@ -48,7 +48,7 @@ impl App {
         Self {
             current_play: Play::new(0),
             cursor_pos: CursorPos::Role,
-            num_players: num_players,
+            num_players,
             scores: (0..num_players).map(|_| ScoreTable::new()).collect(),
         }
     }

@@ -34,6 +34,12 @@ pub struct ScoreTable {
     table: HashMap<Boxes, Record>,
 }
 
+impl Default for ScoreTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScoreTable {
     pub fn new() -> Self {
         ScoreTable {

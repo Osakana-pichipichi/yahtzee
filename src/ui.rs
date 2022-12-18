@@ -203,7 +203,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                             let text = if st.is_filled(b) || pid == app.current_play.player_id {
                                 format!("{}", st.get_score(b))
                             } else {
-                                format!("")
+                                String::new()
                             };
                             let cell = Cell::from(text);
                             match app.cursor_pos {
@@ -262,7 +262,7 @@ fn create_centerd_rect(base_rect: Rect, width: u16, height: u16) -> Rect {
     Rect {
         x: base_rect.x + (base_rect.width - width) / 2,
         y: base_rect.y + (base_rect.height - height) / 2,
-        width: width,
-        height: height,
+        width,
+        height,
     }
 }

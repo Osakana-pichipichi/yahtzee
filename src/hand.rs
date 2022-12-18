@@ -34,12 +34,10 @@ impl Hand {
         for rm_val in elements.iter() {
             if let Some(index) = self.dice.iter().position(|x| x == rm_val) {
                 self.dice.swap_remove(index);
+            } else if Hand::PIPS.contains(rm_val) {
+                info!("There is no \"{}\" to be able to remove.", rm_val);
             } else {
-                if Hand::PIPS.contains(rm_val) {
-                    info!("There is no \"{}\" to be able to remove.", rm_val);
-                } else {
-                    info!("Invalid pip value: {}", rm_val);
-                }
+                info!("Invalid pip value: {}", rm_val);
             }
         }
     }

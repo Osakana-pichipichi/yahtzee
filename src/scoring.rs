@@ -115,7 +115,7 @@ fn four_of_a_kind(dice: &[u32]) -> u32 {
 
 fn full_house(dice: &[u32]) -> u32 {
     let mut sorted_dice: Vec<u32> = dice.to_vec();
-    sorted_dice.sort();
+    sorted_dice.sort_unstable();
     let init = sorted_dice[0];
     let end = sorted_dice[Hand::DICE_NUM - 1];
     let case0 = [init, init, init, end, end];
@@ -129,9 +129,9 @@ fn full_house(dice: &[u32]) -> u32 {
 }
 
 fn small_straight(dice: &[u32]) -> u32 {
-    let unique_dice: HashSet<u32> = dice.to_vec().into_iter().collect();
+    let unique_dice: HashSet<u32> = dice.iter().copied().collect();
     let mut sorted_dice: Vec<u32> = Vec::from_iter(unique_dice);
-    sorted_dice.sort();
+    sorted_dice.sort_unstable();
 
     if sorted_dice.len() < 4 {
         return 0;
@@ -148,7 +148,7 @@ fn small_straight(dice: &[u32]) -> u32 {
 
 fn large_straight(dice: &[u32]) -> u32 {
     let mut sorted_dice: Vec<u32> = dice.to_vec();
-    sorted_dice.sort();
+    sorted_dice.sort_unstable();
     let init = sorted_dice[0];
 
     if sorted_dice == array![i => init + (i as u32); 5] {
