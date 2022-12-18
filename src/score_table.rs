@@ -110,6 +110,20 @@ impl ScoreTable {
             Some(0)
         }
     }
+
+    pub fn get_total_score(&self) -> u32 {
+        let sum = self
+            .table
+            .iter()
+            .map(|(.., row)| row.get_score())
+            .sum::<u32>();
+
+        sum + if let Some(x) = self.calculate_bonus() {
+            x
+        } else {
+            0
+        }
+    }
 }
 
 #[cfg(test)]
@@ -169,5 +183,48 @@ mod tests {
         }
 
         assert_eq!(score_table.calculate_bonus(), Some(0));
+    }
+
+    #[test]
+    fn test_get_total_score() {
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        assert_eq!(
+            score_table.get_total_score(),
+            ScoreTable::BONUM_POINT + ScoreTable::BONUS_THRESHOLD
+        );
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 2);
+        }
+
+        assert_eq!(
+            score_table.get_total_score(),
+            Hand::PIPS.iter().sum::<u32>() * 2
+        );
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        assert_eq!(
+            score_table.get_total_score(),
+            Hand::PIPS[1..].iter().sum::<u32>() * 3
+        );
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
+            score_table.confirm_score(b, p * 2);
+        }
+
+        assert_eq!(
+            score_table.get_total_score(),
+            Hand::PIPS[1..].iter().sum::<u32>() * 2
+        );
     }
 }
