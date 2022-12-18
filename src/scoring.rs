@@ -1,9 +1,8 @@
-use array_macro::*;
-use enum_iterator::*;
+use crate::hand::Hand;
+use array_macro::array;
+use enum_iterator::Sequence;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-
-use crate::hand::*;
 
 const FULL_HOUSE_SCORE: u32 = 25;
 const SMALL_STRAIGHT_SCORE: u32 = 30;

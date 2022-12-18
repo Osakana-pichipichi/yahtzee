@@ -1,8 +1,7 @@
-use enum_iterator::*;
-use std::collections::HashMap;
-
 use crate::hand::Hand;
-use crate::scoring::*;
+use crate::scoring::Boxes;
+use enum_iterator::all;
+use std::collections::HashMap;
 
 struct Record {
     score: u32,
