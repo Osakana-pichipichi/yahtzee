@@ -32,8 +32,8 @@ impl Hand {
 
     pub fn remove_dice(&mut self, elements: &[u32]) {
         for rm_val in elements.iter() {
-            if let Some(index) = self.dice.iter().position(|x| x == rm_val) {
-                self.dice.swap_remove(index);
+            if let Some(index) = self.dice.iter().rposition(|x| x == rm_val) {
+                self.dice.remove(index);
             } else if Hand::PIPS.contains(rm_val) {
                 info!("There is no \"{}\" to be able to remove.", rm_val);
             } else {
