@@ -10,7 +10,6 @@ pub enum AppReturn {
     Continue,
 }
 
-#[derive(PartialEq, Eq)]
 pub enum CursorPos {
     Role,
     Hand(usize),
