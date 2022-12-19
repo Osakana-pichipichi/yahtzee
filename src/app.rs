@@ -20,7 +20,7 @@ pub enum CursorPos {
     Disappear,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum GamePhase {
     Init,
     Roll(usize),
