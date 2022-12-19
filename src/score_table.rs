@@ -1,6 +1,5 @@
 use crate::hand::Hand;
 use crate::scoring::Boxes;
-use enum_iterator::all;
 use std::collections::HashMap;
 
 struct Record {
@@ -69,7 +68,7 @@ impl ScoreTable {
 
     pub fn new() -> Self {
         ScoreTable {
-            table: HashMap::from_iter(all::<Boxes>().map(|b| (b, Record::new()))),
+            table: HashMap::from_iter(enum_iterator::all::<Boxes>().map(|b| (b, Record::new()))),
         }
     }
 
@@ -81,12 +80,21 @@ impl ScoreTable {
         self.table.get(&b).unwrap().is_filled()
     }
 
+    pub fn are_all_cells_filled(&self) -> bool {
+        self.table
+            .iter()
+            .map(|(.., row)| row.is_filled())
+            .all(|x| x)
+    }
+
     pub fn confirm_score(&mut self, b: Boxes, score: u32) {
         self.table.get_mut(&b).unwrap().fill(score);
     }
 
     pub fn remaining_boxes(&self) -> Vec<Boxes> {
-        all::<Boxes>().filter(|&b| self.is_filled(b)).collect()
+        enum_iterator::all::<Boxes>()
+            .filter(|&b| self.is_filled(b))
+            .collect()
     }
 
     pub fn calculate_bonus(&self) -> Option<u32> {

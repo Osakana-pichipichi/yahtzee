@@ -32,10 +32,7 @@ pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
 
         terminal.draw(|f| draw_play_ui(f, &app))?;
 
-        let result = match events.next()? {
-            InputEvent::Input(key) => app.do_action(key),
-            _ => AppReturn::Continue,
-        };
+        let result = app.do_action(events.next()?);
 
         if result == AppReturn::Exit {
             break;
