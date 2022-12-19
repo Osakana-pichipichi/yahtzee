@@ -243,23 +243,23 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                                 _ => cell.style(Style::default().fg(Color::Yellow)),
                             }
                         })
-                        .collect::<Vec<Cell>>()
+                        .collect::<Vec<_>>()
                         .into_iter(),
                 ),
             )
         })
-        .collect::<Vec<Row>>();
+        .collect::<Vec<_>>();
     let score_header = Row::new(
         vec![String::from("")].into_iter().chain(
             (0..app.num_players)
                 .map(|x| format!("Player{}", x))
-                .collect::<Vec<String>>()
+                .collect::<Vec<_>>()
                 .into_iter(),
         ),
     );
     let score_table_width = (0..(app.num_players + 1))
         .map(|x| Constraint::Length(if x == 0 { 20 } else { 7 }))
-        .collect::<Vec<Constraint>>();
+        .collect::<Vec<_>>();
     let score_block = Table::new(score_rows)
         .style(
             Style::default()
