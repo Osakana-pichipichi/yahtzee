@@ -68,11 +68,11 @@ impl ScoreTable {
     }
 
     pub fn get_score(&self, b: Boxes) -> &Option<u32> {
-        self.table.get(&b).unwrap().get_score()
+        self.table[&b].get_score()
     }
 
     pub fn has_score_in(&self, b: Boxes) -> bool {
-        self.table.get(&b).unwrap().is_filled()
+        self.table[&b].is_filled()
     }
 
     pub fn has_all_scores(&self) -> bool {
