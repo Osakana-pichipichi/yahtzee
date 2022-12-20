@@ -247,9 +247,17 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         })
         .collect::<Vec<_>>();
     let score_header = Row::new(
-        vec![String::from("")].into_iter().chain(
+        vec![Cell::from(String::from(""))].into_iter().chain(
             (0..app.num_players)
-                .map(|x| format!("Player{}", x))
+                .map(|pid| {
+                    let text = format!("Player{}", pid);
+                    let style = if pid == app.play.player_id {
+                        Style::default().fg(Color::Black).bg(Color::LightYellow)
+                    } else {
+                        Style::default()
+                    };
+                    Cell::from(text).style(style)
+                })
                 .collect::<Vec<_>>()
                 .into_iter(),
         ),
