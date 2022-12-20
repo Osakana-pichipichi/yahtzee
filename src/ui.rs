@@ -214,9 +214,9 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                         .map(|pid| {
                             let st = &app.scores[pid];
                             let hand = &app.play.hand;
-                            let mut style = Style::default();
                             let player = app.play.player_id;
                             let pos = CursorPos::Table(b);
+
                             let text = if st.is_filled(b) {
                                 format!("{}", st.get_score(b))
                             } else if hand.get_dice().len() < Hand::DICE_NUM {
@@ -226,13 +226,19 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                             } else {
                                 String::new()
                             };
-                            let cell = Cell::from(text);
-                            if app.cursor_pos == pos && pid == player {
-                                style = style.fg(Color::Yellow).bg(Color::White)
+
+                            let mut style = if app.cursor_pos == pos && pid == player {
+                                Style::default().fg(Color::DarkGray).bg(Color::White)
                             } else {
-                                style = style.fg(Color::Yellow)
-                            }
-                            cell.style(style)
+                                Style::default()
+                            };
+                            style = if !st.is_filled(b) && pid == player {
+                                style.fg(Color::Yellow)
+                            } else {
+                                style
+                            };
+
+                            Cell::from(text).style(style)
                         })
                         .collect::<Vec<_>>()
                         .into_iter(),
