@@ -3,33 +3,28 @@ use crate::scoring::Boxes;
 use std::collections::HashMap;
 
 struct Record {
-    score: u32,
-    filled: bool,
+    score: Option<u32>,
 }
 
 impl Record {
     fn new() -> Self {
-        Record {
-            score: 0,
-            filled: false,
-        }
+        Record { score: None }
     }
 
     fn fill(&mut self, score: u32) {
         if !self.is_filled() {
-            self.score = score;
-            self.filled = true;
+            self.score = Some(score);
         } else {
             panic!("The record to be filled is already filled.");
         }
     }
 
-    fn get_score(&self) -> u32 {
-        self.score
+    fn get_score(&self) -> &Option<u32> {
+        &self.score
     }
 
     fn is_filled(&self) -> bool {
-        self.filled
+        matches!(self.score, Some(..))
     }
 }
 
@@ -72,15 +67,15 @@ impl ScoreTable {
         }
     }
 
-    pub fn get_score(&self, b: Boxes) -> u32 {
+    pub fn get_score(&self, b: Boxes) -> &Option<u32> {
         self.table.get(&b).unwrap().get_score()
     }
 
-    pub fn is_filled(&self, b: Boxes) -> bool {
+    pub fn has_score_in(&self, b: Boxes) -> bool {
         self.table.get(&b).unwrap().is_filled()
     }
 
-    pub fn are_all_cells_filled(&self) -> bool {
+    pub fn has_all_scores(&self) -> bool {
         self.table
             .iter()
             .map(|(.., row)| row.is_filled())
@@ -93,20 +88,23 @@ impl ScoreTable {
 
     pub fn remaining_boxes(&self) -> Vec<Boxes> {
         enum_iterator::all::<Boxes>()
-            .filter(|&b| self.is_filled(b))
+            .filter(|&b| self.has_score_in(b))
             .collect()
     }
 
     pub fn calculate_bonus(&self) -> Option<u32> {
         let current: u32 = ScoreTable::BONUS_TARGETS
             .iter()
-            .map(|&(b, ..)| self.get_score(b))
+            .map(|&(b, ..)| match self.get_score(b) {
+                Some(score) => score,
+                None => &0,
+            })
             .sum();
         let max: u32 = ScoreTable::BONUS_TARGETS
             .iter()
             .map(|&(b, p)| {
-                if self.is_filled(b) {
-                    self.get_score(b)
+                if self.has_score_in(b) {
+                    self.get_score(b).unwrap()
                 } else {
                     p * (Hand::DICE_NUM as u32)
                 }
@@ -123,11 +121,14 @@ impl ScoreTable {
     }
 
     pub fn get_total_score(&self) -> u32 {
-        let sum = self
+        let sum: u32 = self
             .table
-            .iter()
-            .map(|(.., row)| row.get_score())
-            .sum::<u32>();
+            .keys()
+            .map(|&b| match self.get_score(b) {
+                Some(score) => score,
+                None => &0,
+            })
+            .sum();
 
         sum + if let Some(x) = self.calculate_bonus() {
             x
@@ -148,7 +149,7 @@ mod tests {
 
         let score: u32 = 32;
         record.fill(score);
-        assert_eq!(record.get_score(), score);
+        assert_eq!(record.get_score(), &Some(score));
         assert!(record.is_filled());
     }
 
@@ -158,11 +159,11 @@ mod tests {
         let b = Boxes::Chance;
         let score: u32 = 21;
 
-        assert!(!score_table.is_filled(b));
+        assert!(!score_table.has_score_in(b));
 
         score_table.confirm_score(b, score);
-        assert!(score_table.is_filled(b));
-        assert_eq!(score_table.get_score(b), score);
+        assert!(score_table.has_score_in(b));
+        assert_eq!(score_table.get_score(b), &Some(score));
     }
 
     #[test]

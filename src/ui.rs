@@ -217,8 +217,8 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                             let player = app.play.player_id;
                             let pos = CursorPos::Table(b);
 
-                            let text = if st.is_filled(b) {
-                                format!("{}", st.get_score(b))
+                            let text = if st.has_score_in(b) {
+                                format!("{}", st.get_score(b).unwrap())
                             } else if hand.get_dice().len() < Hand::DICE_NUM {
                                 String::new()
                             } else if pid == player {
@@ -232,7 +232,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                             } else {
                                 Style::default()
                             };
-                            style = if !st.is_filled(b) && pid == player {
+                            style = if !st.has_score_in(b) && pid == player {
                                 style.fg(Color::Yellow)
                             } else {
                                 style

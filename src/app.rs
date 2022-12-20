@@ -190,12 +190,12 @@ impl App {
                     CursorPos::Table(pos) => {
                         let pid = self.play.player_id;
                         let score_table = &mut self.scores[pid];
-                        if !score_table.is_filled(pos) {
+                        if !score_table.has_score_in(pos) {
                             let dice = self.play.hand.get_dice();
                             score_table.confirm_score(pos, scoring(pos, dice));
                             let new_pid = (pid + 1) % self.num_players;
                             self.play = Play::new(new_pid);
-                            if !self.scores[new_pid].are_all_cells_filled() {
+                            if !self.scores[new_pid].has_all_scores() {
                                 self.cursor_pos = CursorPos::Role;
                             } else {
                                 self.state = AppState::Result;
@@ -339,12 +339,12 @@ impl App {
                     CursorPos::Table(pos) => {
                         let pid = self.play.player_id;
                         let score_table = &mut self.scores[pid];
-                        if !score_table.is_filled(pos) {
+                        if !score_table.has_score_in(pos) {
                             let dice = self.play.hand.get_dice();
                             score_table.confirm_score(pos, scoring(pos, dice));
                             let new_pid = (pid + 1) % self.num_players;
                             self.play = Play::new(new_pid);
-                            if !self.scores[new_pid].are_all_cells_filled() {
+                            if !self.scores[new_pid].has_all_scores() {
                                 self.cursor_pos = CursorPos::Role;
                             } else {
                                 self.state = AppState::Result;
