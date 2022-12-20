@@ -6,12 +6,13 @@ use array_macro::array;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use enum_iterator::Sequence;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub enum AppReturn {
     Exit,
     Continue,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum CursorPos {
     Role,
     Hand(usize),
@@ -20,7 +21,6 @@ pub enum CursorPos {
     Disappear,
 }
 
-#[derive(Debug)]
 pub enum GamePhase {
     Init,
     Roll(usize),
@@ -53,7 +53,7 @@ pub enum AppState {
 
 pub struct App {
     pub state: AppState,
-    pub current_play: Play,
+    pub play: Play,
     pub cursor_pos: CursorPos,
     pub num_players: usize,
     pub scores: Vec<ScoreTable>,
@@ -65,7 +65,7 @@ impl App {
     pub fn new(num_players: usize) -> Self {
         Self {
             state: AppState::Play,
-            current_play: Play::new(0),
+            play: Play::new(0),
             cursor_pos: CursorPos::Role,
             num_players,
             scores: (0..num_players).map(|_| ScoreTable::new()).collect(),
@@ -73,7 +73,7 @@ impl App {
     }
 
     pub fn do_action(&mut self, input_event: InputEvent) -> AppReturn {
-        match self.current_play.game_phase {
+        match self.play.game_phase {
             GamePhase::Init => self.do_action_in_init(input_event),
             GamePhase::Roll(..) => self.do_action_in_roll(input_event),
             GamePhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
@@ -93,8 +93,8 @@ impl App {
                 code: KeyCode::Enter | KeyCode::Char(' '),
                 ..
             }) => {
-                self.current_play.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
-                self.current_play.game_phase = GamePhase::Roll(0);
+                self.play.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
+                self.play.game_phase = GamePhase::Roll(0);
                 self.cursor_pos = CursorPos::Role;
                 AppReturn::Continue
             }
@@ -115,18 +115,18 @@ impl App {
                 code: KeyCode::Enter | KeyCode::Char(' '),
                 ..
             }) => {
-                let count = if let GamePhase::Roll(count) = self.current_play.game_phase {
+                let count = if let GamePhase::Roll(count) = self.play.game_phase {
                     count + 1
                 } else {
                     panic!("Unexpected status!")
                 };
 
-                self.current_play.is_held = [true; Hand::DICE_NUM];
+                self.play.is_held = [true; Hand::DICE_NUM];
                 if count < App::MAX_ROLL_COUNT {
-                    self.current_play.game_phase = GamePhase::SelectOrReroll(count);
+                    self.play.game_phase = GamePhase::SelectOrReroll(count);
                     self.cursor_pos = CursorPos::Hand(0);
                 } else {
-                    self.current_play.game_phase = GamePhase::Select;
+                    self.play.game_phase = GamePhase::Select;
                     self.cursor_pos = CursorPos::Table(Boxes::Aces);
                 }
 
@@ -134,15 +134,15 @@ impl App {
             }
 
             _ => {
-                let dice = self.current_play.hand.get_dice();
+                let dice = self.play.hand.get_dice();
                 let removed_dice = dice
                     .iter()
-                    .zip(self.current_play.is_held.iter())
+                    .zip(self.play.is_held.iter())
                     .filter(|(.., &is_heled)| !is_heled)
                     .map(|(&d, ..)| d)
                     .collect::<Vec<_>>();
-                self.current_play.hand.remove_dice(&removed_dice);
-                self.current_play
+                self.play.hand.remove_dice(&removed_dice);
+                self.play
                     .hand
                     .add_dice(&Hand::new_with_random_n_dice(removed_dice.len()));
                 AppReturn::Continue
@@ -164,38 +164,37 @@ impl App {
             }) => {
                 match self.cursor_pos {
                     CursorPos::Role => {
-                        let dice = self.current_play.hand.get_dice();
+                        let dice = self.play.hand.get_dice();
                         let removed_dice = dice
                             .iter()
-                            .zip(self.current_play.is_held.iter())
+                            .zip(self.play.is_held.iter())
                             .filter(|(.., &is_heled)| !is_heled)
                             .map(|(&d, ..)| d)
                             .collect::<Vec<_>>();
-                        self.current_play.hand.remove_dice(&removed_dice);
-                        self.current_play.is_held =
+                        self.play.hand.remove_dice(&removed_dice);
+                        self.play.is_held =
                             array![i => i < Hand::DICE_NUM - removed_dice.len(); Hand::DICE_NUM];
-                        self.current_play
+                        self.play
                             .hand
                             .add_dice(&Hand::new_with_random_n_dice(removed_dice.len()));
-                        self.current_play.game_phase = if let GamePhase::SelectOrReroll(count) =
-                            self.current_play.game_phase
-                        {
-                            GamePhase::Roll(count)
-                        } else {
-                            panic!("Unexpected status!")
-                        };
+                        self.play.game_phase =
+                            if let GamePhase::SelectOrReroll(count) = self.play.game_phase {
+                                GamePhase::Roll(count)
+                            } else {
+                                panic!("Unexpected status!")
+                            };
                     }
                     CursorPos::Hand(pos) | CursorPos::Dust(pos) => {
-                        self.current_play.is_held[pos] = !self.current_play.is_held[pos]
+                        self.play.is_held[pos] = !self.play.is_held[pos]
                     }
                     CursorPos::Table(pos) => {
-                        let pid = self.current_play.player_id;
+                        let pid = self.play.player_id;
                         let score_table = &mut self.scores[pid];
                         if !score_table.is_filled(pos) {
-                            let dice = self.current_play.hand.get_dice();
+                            let dice = self.play.hand.get_dice();
                             score_table.confirm_score(pos, scoring(pos, dice));
                             let new_pid = (pid + 1) % self.num_players;
-                            self.current_play = Play::new(new_pid);
+                            self.play = Play::new(new_pid);
                             if !self.scores[new_pid].are_all_cells_filled() {
                                 self.cursor_pos = CursorPos::Role;
                             } else {
@@ -321,31 +320,30 @@ impl App {
             }) => {
                 match self.cursor_pos {
                     CursorPos::Role => {
-                        let dice = self.current_play.hand.get_dice();
+                        let dice = self.play.hand.get_dice();
                         let removed_dice = dice
                             .iter()
-                            .zip(self.current_play.is_held.iter())
+                            .zip(self.play.is_held.iter())
                             .filter(|(.., &is_heled)| !is_heled)
                             .map(|(&d, ..)| d)
                             .collect::<Vec<_>>();
-                        self.current_play.hand.remove_dice(&removed_dice);
-                        self.current_play.is_held =
-                            array![i => i < removed_dice.len(); Hand::DICE_NUM];
-                        self.current_play
+                        self.play.hand.remove_dice(&removed_dice);
+                        self.play.is_held = array![i => i < removed_dice.len(); Hand::DICE_NUM];
+                        self.play
                             .hand
                             .add_dice(&Hand::new_with_random_n_dice(removed_dice.len()));
                     }
                     CursorPos::Hand(pos) | CursorPos::Dust(pos) => {
-                        self.current_play.is_held[pos] = !self.current_play.is_held[pos]
+                        self.play.is_held[pos] = !self.play.is_held[pos]
                     }
                     CursorPos::Table(pos) => {
-                        let pid = self.current_play.player_id;
+                        let pid = self.play.player_id;
                         let score_table = &mut self.scores[pid];
                         if !score_table.is_filled(pos) {
-                            let dice = self.current_play.hand.get_dice();
+                            let dice = self.play.hand.get_dice();
                             score_table.confirm_score(pos, scoring(pos, dice));
                             let new_pid = (pid + 1) % self.num_players;
-                            self.current_play = Play::new(new_pid);
+                            self.play = Play::new(new_pid);
                             if !self.scores[new_pid].are_all_cells_filled() {
                                 self.cursor_pos = CursorPos::Role;
                             } else {

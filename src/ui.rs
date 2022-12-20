@@ -108,8 +108,8 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         ])
         .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in app.current_play.hand.get_dice().iter().enumerate() {
-        let text = match (&app.current_play.game_phase, app.current_play.is_held[i]) {
+    for (i, &d) in app.play.hand.get_dice().iter().enumerate() {
+        let text = match (&app.play.game_phase, app.play.is_held[i]) {
             (GamePhase::Roll(..), ..) | (.., true) => vec![
                 Spans::from(Span::styled(
                     DICE_STR[(d - 1) as usize][0],
@@ -127,14 +127,10 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             _ => vec![],
         };
         let text = Paragraph::new(text)
-            .block(
-                match (&app.current_play.game_phase, app.current_play.is_held[i]) {
-                    (GamePhase::Roll(..), ..) | (.., true) => {
-                        Block::default().borders(Borders::ALL)
-                    }
-                    _ => Block::default(),
-                },
-            )
+            .block(match (&app.play.game_phase, app.play.is_held[i]) {
+                (GamePhase::Roll(..), ..) | (.., true) => Block::default().borders(Borders::ALL),
+                _ => Block::default(),
+            })
             .style(match app.cursor_pos {
                 CursorPos::Hand(pos) => {
                     if i == pos {
@@ -170,8 +166,8 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         ])
         .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in app.current_play.hand.get_dice().iter().enumerate() {
-        let text = match (&app.current_play.game_phase, app.current_play.is_held[i]) {
+    for (i, &d) in app.play.hand.get_dice().iter().enumerate() {
+        let text = match (&app.play.game_phase, app.play.is_held[i]) {
             (GamePhase::Roll(..), ..) | (.., true) => vec![],
             _ => vec![
                 Spans::from(Span::styled(
@@ -189,12 +185,10 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             ],
         };
         let text = Paragraph::new(text)
-            .block(
-                match (&app.current_play.game_phase, app.current_play.is_held[i]) {
-                    (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
-                    _ => Block::default().borders(Borders::ALL),
-                },
-            )
+            .block(match (&app.play.game_phase, app.play.is_held[i]) {
+                (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
+                _ => Block::default().borders(Borders::ALL),
+            })
             .style(match app.cursor_pos {
                 CursorPos::Dust(pos) => {
                     if i == pos {
@@ -219,29 +213,26 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     (0..app.num_players)
                         .map(|pid| {
                             let st = &app.scores[pid];
+                            let hand = &app.play.hand;
+                            let mut style = Style::default();
+                            let player = app.play.player_id;
+                            let pos = CursorPos::Table(b);
                             let text = if st.is_filled(b) {
                                 format!("{}", st.get_score(b))
-                            } else if app.current_play.hand.get_dice().len() < Hand::DICE_NUM {
+                            } else if hand.get_dice().len() < Hand::DICE_NUM {
                                 String::new()
-                            } else if pid == app.current_play.player_id {
-                                format!("{}", scoring(b, app.current_play.hand.get_dice()))
+                            } else if pid == player {
+                                format!("{}", scoring(b, hand.get_dice()))
                             } else {
                                 String::new()
                             };
                             let cell = Cell::from(text);
-                            match app.cursor_pos {
-                                CursorPos::Table(pos) => {
-                                    if b == pos && pid == app.current_play.player_id {
-                                        cell.style(
-                                            Style::default().fg(Color::Yellow).bg(Color::White),
-                                        )
-                                    } else {
-                                        cell.style(Style::default().fg(Color::Yellow))
-                                    }
-                                }
-
-                                _ => cell.style(Style::default().fg(Color::Yellow)),
+                            if app.cursor_pos == pos && pid == player {
+                                style = style.fg(Color::Yellow).bg(Color::White)
+                            } else {
+                                style = style.fg(Color::Yellow)
                             }
+                            cell.style(style)
                         })
                         .collect::<Vec<_>>()
                         .into_iter(),
