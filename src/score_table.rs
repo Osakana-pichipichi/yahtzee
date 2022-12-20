@@ -2,6 +2,7 @@ use crate::hand::Hand;
 use crate::scoring::Boxes;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 struct Record {
     score: Option<u32>,
 }
@@ -9,6 +10,10 @@ struct Record {
 impl Record {
     fn new() -> Self {
         Record { score: None }
+    }
+
+    fn new_with_score(score: u32) -> Self {
+        Record { score: Some(score) }
     }
 
     fn fill(&mut self, score: u32) {
@@ -120,6 +125,20 @@ impl ScoreTable {
         }
     }
 
+    pub fn calculate_bonus_if_filled_by(&self, b: Boxes, score: u32) -> Option<u32> {
+        let mut dummy_table = HashMap::new();
+        dummy_table.clone_from(&self.table);
+
+        let mut dummy_score_table = ScoreTable { table: dummy_table };
+        if !dummy_score_table.has_score_in(b) {
+            dummy_score_table
+                .table
+                .insert(b, Record::new_with_score(score));
+        }
+
+        dummy_score_table.calculate_bonus()
+    }
+
     pub fn get_total_score(&self) -> u32 {
         let sum: u32 = self
             .table
@@ -135,6 +154,20 @@ impl ScoreTable {
         } else {
             0
         }
+    }
+
+    pub fn get_total_score_if_filled_by(&mut self, b: Boxes, score: u32) -> u32 {
+        let mut dummy_table = HashMap::new();
+        dummy_table.clone_from(&self.table);
+
+        let mut dummy_score_table = ScoreTable { table: dummy_table };
+        if !dummy_score_table.has_score_in(b) {
+            dummy_score_table
+                .table
+                .insert(b, Record::new_with_score(score));
+        }
+
+        dummy_score_table.get_total_score()
     }
 }
 
@@ -198,6 +231,36 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_bonus_if_filled_by() {
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        let result = score_table.calculate_bonus_if_filled_by(Boxes::Chance, 20);
+        assert_eq!(result, Some(ScoreTable::BONUM_POINT));
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 2);
+        }
+
+        let result = score_table.calculate_bonus_if_filled_by(Boxes::Chance, 20);
+        assert_eq!(result, Some(0));
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        let (b, p) = ScoreTable::BONUS_TARGETS[0];
+        let result = score_table.calculate_bonus_if_filled_by(b, p * 2);
+        assert_eq!(result, Some(0));
+        let result = score_table.calculate_bonus_if_filled_by(b, p * 3);
+        assert_eq!(result, Some(ScoreTable::BONUM_POINT));
+    }
+
+    #[test]
     fn test_get_total_score() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
@@ -237,6 +300,44 @@ mod tests {
         assert_eq!(
             score_table.get_total_score(),
             Hand::PIPS[1..].iter().sum::<u32>() * 2
+        );
+    }
+
+    #[test]
+    fn test_get_total_score_if_filled_by() {
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        assert_eq!(
+            score_table.get_total_score_if_filled_by(Boxes::Chance, 20),
+            ScoreTable::BONUM_POINT + ScoreTable::BONUS_THRESHOLD + 20
+        );
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
+            score_table.confirm_score(b, p * 2);
+        }
+
+        assert_eq!(
+            score_table.get_total_score_if_filled_by(Boxes::Chance, 20),
+            Hand::PIPS.iter().sum::<u32>() * 2 + 20
+        );
+
+        let mut score_table = ScoreTable::new();
+        for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
+            score_table.confirm_score(b, p * 3);
+        }
+
+        let (b, p) = ScoreTable::BONUS_TARGETS[0];
+        assert_eq!(
+            score_table.get_total_score_if_filled_by(b, p * 3),
+            Hand::PIPS.iter().sum::<u32>() * 3 + ScoreTable::BONUM_POINT
+        );
+        assert_eq!(
+            score_table.get_total_score_if_filled_by(b, p * 2),
+            Hand::PIPS[1..].iter().sum::<u32>() * 3 + 2
         );
     }
 }
