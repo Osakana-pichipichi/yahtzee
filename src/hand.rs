@@ -70,6 +70,11 @@ mod tests {
 
     #[test]
     fn remove_dice_test() {
+        let mut h0 = Hand {
+            dice: vec![1, 3, 2, 3, 5]
+        };
+        h0.remove_dice(&[3, 1]);
+        assert_eq!(h0.get_dice(), [3, 2, 5]);
         let mut h0 = Hand::new_with_random_n_dice(4);
         let d = h0.get_dice();
         let d = [d[0], d[2]];
