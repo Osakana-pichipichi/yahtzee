@@ -280,8 +280,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                 .add_modifier(Modifier::BOLD)
                 .fg(Color::DarkGray)
                 .bg(Color::White),
-        )
-        .highlight_symbol(">>");
+        );
 
     f.render_widget(score_block, chunk);
 }
