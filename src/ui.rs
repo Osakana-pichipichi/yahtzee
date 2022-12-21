@@ -1,5 +1,6 @@
 use crate::app::{App, CursorPos, GamePhase};
 use crate::hand::Hand;
+use crate::score_table::ScoreTable;
 use crate::scoring::{box_name, scoring, Boxes};
 use tui::{
     backend::Backend,
@@ -44,6 +45,9 @@ const DICE_STR: [[&str; 3]; 6] = [
         " * * ",
     ],
 ];
+
+const BOXES_CELL_WIDTH: usize = 20;
+const SCORE_CELL_WIDTH: usize = 11;
 
 pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     /* Distribute the screen */
@@ -206,51 +210,115 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 }
 
 fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
-    let score_rows = enum_iterator::all::<Boxes>()
+    let mut score_rows = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
-                vec![Cell::from(box_name(b).to_string())].into_iter().chain(
-                    (0..app.num_players)
-                        .map(|pid| {
-                            let st = &app.scores[pid];
-                            let hand = &app.play.hand;
-                            let player = app.play.player_id;
-                            let pos = CursorPos::Table(b);
+                vec![Cell::from(format!("{:>1$}", box_name(b), BOXES_CELL_WIDTH))]
+                    .into_iter()
+                    .chain(
+                        (0..app.num_players)
+                            .map(|pid| {
+                                let st = &app.scores[pid];
+                                let hand = &app.play.hand;
+                                let player = app.play.player_id;
+                                let pos = CursorPos::Table(b);
 
-                            let text = if st.has_score_in(b) {
-                                format!("{}", st.get_score(b).unwrap())
-                            } else if hand.get_dice().len() < Hand::DICE_NUM {
-                                String::new()
-                            } else if pid == player {
-                                format!("{}", scoring(b, hand.get_dice()))
-                            } else {
-                                String::new()
-                            };
+                                let text = if st.has_score_in(b) {
+                                    format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
+                                } else if hand.get_dice().len() < Hand::DICE_NUM {
+                                    String::new()
+                                } else if pid == player {
+                                    format!("{:>1$}", scoring(b, hand.get_dice()), SCORE_CELL_WIDTH)
+                                } else {
+                                    String::new()
+                                };
 
-                            let mut style = if app.cursor_pos == pos && pid == player {
-                                Style::default().fg(Color::DarkGray).bg(Color::White)
-                            } else {
-                                Style::default()
-                            };
-                            style = if !st.has_score_in(b) && pid == player {
-                                style.fg(Color::Yellow)
-                            } else {
-                                style
-                            };
+                                let mut style = if app.cursor_pos == pos && pid == player {
+                                    Style::default().fg(Color::DarkGray).bg(Color::White)
+                                } else {
+                                    Style::default()
+                                };
+                                style = if !st.has_score_in(b) && pid == player {
+                                    style.fg(Color::Yellow)
+                                } else {
+                                    style
+                                };
 
-                            Cell::from(text).style(style)
-                        })
-                        .collect::<Vec<_>>()
-                        .into_iter(),
-                ),
+                                Cell::from(text).style(style)
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter(),
+                    ),
             )
         })
         .collect::<Vec<_>>();
+    let bonus_cell = Row::new(
+        vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
+            .into_iter()
+            .chain((0..app.num_players).map(|pid| {
+                let dice = app.play.hand.get_dice();
+                let st = &app.scores[pid];
+                let mut bstext = format!("{:>2}", "");
+                let mut bsstyle = Style::default();
+                let us = st.get_total_upper_score();
+                let mut ustext = format!("{:>3}", us);
+                let mut usstyle = Style::default();
+                if let (Some(score), true) = (st.calculate_bonus(), pid == app.play.player_id) {
+                    bstext = format!("{:>2}", score);
+                } else if pid == app.play.player_id {
+                    if let CursorPos::Table(b) = app.cursor_pos {
+                        let score = scoring(b, dice);
+
+                        let ifus = st.get_total_upper_score_if_filled_by(b, score);
+                        if ifus > us {
+                            ustext = format!("{:>3}", ifus);
+                            usstyle = usstyle.fg(Color::Yellow);
+                        }
+
+                        if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
+                            bstext = format!("{:>2}", score);
+                            bsstyle = bsstyle.fg(Color::Yellow);
+                        }
+                    }
+                }
+
+                Cell::from(Spans::from(vec![
+                    Span::styled(bstext, bsstyle),
+                    Span::raw(" ("),
+                    Span::styled(ustext, usstyle),
+                    Span::raw(format!("/{:>2})", ScoreTable::BONUS_THRESHOLD)),
+                ]))
+            })),
+    );
+    score_rows.push(bonus_cell);
+    let total_cell = Row::new(
+        vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
+            .into_iter()
+            .chain((0..app.num_players).map(|pid| {
+                let dice = app.play.hand.get_dice();
+                let st = &app.scores[pid];
+                let total_score = st.get_total_score();
+                let mut text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
+                let mut style = Style::default();
+                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, app.play.player_id == pid) {
+                    let score = scoring(b, dice);
+
+                    let if_total_score = st.get_total_score_if_filled_by(b, score);
+                    if if_total_score > total_score {
+                        text = format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH);
+                        style = style.fg(Color::Yellow);
+                    }
+                }
+
+                Cell::from(text).style(style)
+            })),
+    );
+    score_rows.push(total_cell);
     let score_header = Row::new(
         vec![Cell::from(String::from(""))].into_iter().chain(
             (0..app.num_players)
                 .map(|pid| {
-                    let text = format!("Player{}", pid);
+                    let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
                     let style = if pid == app.play.player_id {
                         Style::default().fg(Color::Black).bg(Color::LightYellow)
                     } else {
@@ -263,7 +331,13 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         ),
     );
     let score_table_width = (0..(app.num_players + 1))
-        .map(|x| Constraint::Length(if x == 0 { 20 } else { 7 }))
+        .map(|x| {
+            Constraint::Length(if x == 0 {
+                BOXES_CELL_WIDTH as u16
+            } else {
+                SCORE_CELL_WIDTH as u16
+            })
+        })
         .collect::<Vec<_>>();
     let score_block = Table::new(score_rows)
         .style(

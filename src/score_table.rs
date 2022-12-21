@@ -54,7 +54,7 @@ impl ScoreTable {
             (Boxes::Sixes, 6),
         ]
     };
-    const BONUS_THRESHOLD: u32 = {
+    pub const BONUS_THRESHOLD: u32 = {
         /* This means (1 + 2 + 3 + 4 + 5 + 6) * 3. */
         let mut sum = 0;
         let mut i = 1;
