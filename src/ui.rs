@@ -258,27 +258,30 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             .chain((0..app.num_players).map(|pid| {
                 let dice = app.play.hand.get_dice();
                 let st = &app.scores[pid];
+                let is_playing = pid == app.play.player_id;
+
                 let mut bstext = format!("{:>2}", "");
                 let mut bsstyle = Style::default();
                 let us = st.get_total_upper_score();
                 let mut ustext = format!("{:>3}", us);
                 let mut usstyle = Style::default();
-                if let (Some(score), true) = (st.calculate_bonus(), pid == app.play.player_id) {
+
+                if let Some(score) = st.calculate_bonus() {
                     bstext = format!("{:>2}", score);
-                } else if pid == app.play.player_id {
-                    if let CursorPos::Table(b) = app.cursor_pos {
-                        let score = scoring(b, dice);
+                } else if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
+                    let score = scoring(b, dice);
+                    if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
+                        bstext = format!("{:>2}", score);
+                        bsstyle = bsstyle.fg(Color::Yellow);
+                    }
+                }
 
-                        let ifus = st.get_total_upper_score_if_filled_by(b, score);
-                        if ifus > us {
-                            ustext = format!("{:>3}", ifus);
-                            usstyle = usstyle.fg(Color::Yellow);
-                        }
-
-                        if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
-                            bstext = format!("{:>2}", score);
-                            bsstyle = bsstyle.fg(Color::Yellow);
-                        }
+                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
+                    let score = scoring(b, dice);
+                    let ifus = st.get_total_upper_score_if_filled_by(b, score);
+                    if ifus > us {
+                        ustext = format!("{:>3}", ifus);
+                        usstyle = usstyle.fg(Color::Yellow);
                     }
                 }
 
@@ -297,10 +300,11 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             .chain((0..app.num_players).map(|pid| {
                 let dice = app.play.hand.get_dice();
                 let st = &app.scores[pid];
+                let is_playing = pid == app.play.player_id;
                 let total_score = st.get_total_score();
                 let mut text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let mut style = Style::default();
-                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, app.play.player_id == pid) {
+                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
                     let score = scoring(b, dice);
 
                     let if_total_score = st.get_total_score_if_filled_by(b, score);
