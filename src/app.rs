@@ -165,24 +165,26 @@ impl App {
                 match self.cursor_pos {
                     CursorPos::Role => {
                         let dice = self.play.hand.get_dice();
-                        let removed_dice = dice
-                            .iter()
-                            .zip(self.play.is_held.iter())
-                            .filter(|(.., &is_heled)| !is_heled)
-                            .map(|(&d, ..)| d)
-                            .collect::<Vec<_>>();
-                        self.play.hand.remove_dice(&removed_dice);
-                        self.play.is_held =
-                            array![i => i < Hand::DICE_NUM - removed_dice.len(); Hand::DICE_NUM];
-                        self.play
-                            .hand
-                            .add_dice(&Hand::new_with_random_n_dice(removed_dice.len()));
-                        self.play.game_phase =
-                            if let GamePhase::SelectOrReroll(count) = self.play.game_phase {
-                                GamePhase::Roll(count)
-                            } else {
-                                panic!("Unexpected status!")
-                            };
+                        if !self.play.is_held.iter().all(|&x| x) {
+                            let removed_dice = dice
+                                .iter()
+                                .zip(self.play.is_held.iter())
+                                .filter(|(.., &is_heled)| !is_heled)
+                                .map(|(&d, ..)| d)
+                                .collect::<Vec<_>>();
+                            self.play.hand.remove_dice(&removed_dice);
+                            let rests_len = Hand::DICE_NUM - removed_dice.len();
+                            self.play.is_held = array![i => i < rests_len; Hand::DICE_NUM];
+                            self.play
+                                .hand
+                                .add_dice(&Hand::new_with_random_n_dice(removed_dice.len()));
+                            self.play.game_phase =
+                                if let GamePhase::SelectOrReroll(count) = self.play.game_phase {
+                                    GamePhase::Roll(count)
+                                } else {
+                                    panic!("Unexpected status!")
+                                };
+                        }
                     }
                     CursorPos::Hand(pos) | CursorPos::Dust(pos) => {
                         self.play.is_held[pos] = !self.play.is_held[pos]
@@ -266,7 +268,9 @@ impl App {
             }) => {
                 match self.cursor_pos {
                     CursorPos::Hand(..) => {
-                        self.cursor_pos = CursorPos::Role;
+                        if !self.play.is_held.iter().all(|&x| x) {
+                            self.cursor_pos = CursorPos::Role;
+                        }
                     }
                     CursorPos::Dust(pos) => {
                         self.cursor_pos = CursorPos::Hand(pos);
