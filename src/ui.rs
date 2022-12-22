@@ -99,6 +99,7 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     } else {
         panic!()
     };
+
     let block = Block::default().title("Dice").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -162,6 +163,7 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     } else {
         panic!()
     };
+
     let block = Block::default().title("Dust").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -225,6 +227,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     } else {
         panic!()
     };
+
     let mut score_rows = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
@@ -367,13 +370,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         .header(score_header)
         .block(Block::default().title("SCORE").borders(Borders::ALL))
         .widths(&score_table_width)
-        .column_spacing(1)
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .fg(Color::DarkGray)
-                .bg(Color::White),
-        );
+        .column_spacing(1);
 
     f.render_widget(score_block, chunk);
 }
