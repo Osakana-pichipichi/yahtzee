@@ -7,7 +7,7 @@ mod ui;
 
 use crate::app::{App, AppReturn};
 use crate::events::{Events, InputEvent};
-use crate::ui::draw_play_ui;
+use crate::ui::draw_ui;
 use anyhow::Result;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -30,7 +30,7 @@ pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
     loop {
         let mut app = app.borrow_mut();
 
-        terminal.draw(|f| draw_play_ui(f, &app))?;
+        terminal.draw(|f| draw_ui(f, &app))?;
 
         let result = app.do_action(events.next()?);
 

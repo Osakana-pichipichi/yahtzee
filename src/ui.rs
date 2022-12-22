@@ -49,7 +49,14 @@ const DICE_STR: [[&str; 3]; 6] = [
 const BOXES_CELL_WIDTH: usize = 20;
 const SCORE_CELL_WIDTH: usize = 11;
 
-pub fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+    match app.state {
+        AppState::Play(..) => draw_play_ui(f, app),
+        AppState::Result => draw_result_ui(f, app),
+    }
+}
+
+fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     /* Distribute the screen */
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -347,6 +354,159 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                         Style::default()
                     };
                     Cell::from(text).style(style)
+                })
+                .collect::<Vec<_>>()
+                .into_iter(),
+        ),
+    );
+    let score_table_width = (0..(app.num_players + 1))
+        .map(|x| {
+            Constraint::Length(if x == 0 {
+                BOXES_CELL_WIDTH as u16
+            } else {
+                SCORE_CELL_WIDTH as u16
+            })
+        })
+        .collect::<Vec<_>>();
+    let score_block = Table::new(score_rows)
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .remove_modifier(Modifier::BOLD),
+        )
+        .header(score_header)
+        .block(Block::default().title("SCORE").borders(Borders::ALL))
+        .widths(&score_table_width)
+        .column_spacing(1);
+
+    f.render_widget(score_block, chunk);
+}
+
+fn draw_result_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+    /* Distribute the screen */
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
+        .split(f.size());
+
+    draw_result(f, app, chunks[0]);
+    draw_result_score_table(f, app, chunks[1]);
+}
+
+fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    match app.state {
+        AppState::Result => (),
+        _ => panic!(),
+    }
+
+    let block = Block::default().borders(Borders::ALL);
+    f.render_widget(block, chunk);
+
+    let height = (app.num_players as u16) + 2;
+    let width = chunk.width - 4;
+
+    let text_chunk = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(100)])
+        .split(create_centerd_rect(chunk, width + 2, height + 2));
+
+    let mut results = (0..app.num_players)
+        .map(|i| (i, app.scores[i].get_total_score()))
+        .collect::<Vec<_>>();
+    results.sort_by(|(.., left), (.., right)| left.cmp(right));
+    let mut results = results
+        .iter()
+        .enumerate()
+        .map(|(rank, (pid, ..))| {
+            Spans::from(Span::styled(
+                format!(
+                    "{:^1$}",
+                    format!("{}. Player{}", rank + 1, pid),
+                    width as usize
+                ),
+                Style::default(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    results.extend([
+        Spans::from(Span::raw("")),
+        Spans::from(Span::styled(
+            format!("{:^1$}", "Press ENTER to exit.", width as usize),
+            Style::default(),
+        )),
+    ]);
+    let text = Paragraph::new(results)
+        .block(Block::default().borders(Borders::ALL))
+        .style(match app.cursor_pos {
+            CursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
+            _ => Style::default(),
+        })
+        .alignment(Alignment::Center);
+    f.render_widget(text, text_chunk[0]);
+}
+
+fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    match app.state {
+        AppState::Result => (),
+        _ => panic!(),
+    }
+
+    let mut score_rows = enum_iterator::all::<Boxes>()
+        .map(|b| {
+            Row::new(
+                vec![Cell::from(format!("{:>1$}", box_name(b), BOXES_CELL_WIDTH))]
+                    .into_iter()
+                    .chain(
+                        (0..app.num_players)
+                            .map(|pid| {
+                                let st = &app.scores[pid];
+                                let score = st.get_score(b).unwrap();
+                                let text = format!("{:>1$}", score, SCORE_CELL_WIDTH);
+
+                                Cell::from(text).style(Style::default())
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter(),
+                    ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let bonus_cell = Row::new(
+        vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
+            .into_iter()
+            .chain((0..app.num_players).map(|pid| {
+                let st = &app.scores[pid];
+                let bstext = format!("{:>2}", st.calculate_bonus().unwrap());
+                let ustext = format!("{:>3}", st.get_total_upper_score());
+
+                Cell::from(Spans::from(vec![
+                    Span::styled(bstext, Style::default()),
+                    Span::raw(" ("),
+                    Span::styled(ustext, Style::default()),
+                    Span::raw(format!("/{:>2})", ScoreTable::BONUS_THRESHOLD)),
+                ]))
+            })),
+    );
+    score_rows.push(bonus_cell);
+    let total_cell = Row::new(
+        vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
+            .into_iter()
+            .chain((0..app.num_players).map(|pid| {
+                let st = &app.scores[pid];
+                let total_score = st.get_total_score();
+                let text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
+
+                Cell::from(text).style(Style::default())
+            })),
+    );
+    score_rows.push(total_cell);
+    let score_header = Row::new(
+        vec![Cell::from(String::from(""))].into_iter().chain(
+            (0..app.num_players)
+                .map(|pid| {
+                    let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
+
+                    Cell::from(text).style(Style::default())
                 })
                 .collect::<Vec<_>>()
                 .into_iter(),
