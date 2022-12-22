@@ -1,4 +1,4 @@
-use crate::app::{App, CursorPos, GamePhase};
+use crate::app::{App, AppState, CursorPos, GamePhase};
 use crate::hand::Hand;
 use crate::score_table::ScoreTable;
 use crate::scoring::{box_name, scoring, Boxes};
@@ -94,6 +94,11 @@ fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 }
 
 fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let play = if let AppState::Play(play) = &app.state {
+        play
+    } else {
+        panic!()
+    };
     let block = Block::default().title("Dice").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -112,8 +117,8 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         ])
         .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in app.play.hand.get_dice().iter().enumerate() {
-        let text = match (&app.play.game_phase, app.play.is_held[i]) {
+    for (i, &d) in play.hand.get_dice().iter().enumerate() {
+        let text = match (&play.game_phase, play.is_held[i]) {
             (GamePhase::Roll(..), ..) | (.., true) => vec![
                 Spans::from(Span::styled(
                     DICE_STR[(d - 1) as usize][0],
@@ -131,7 +136,7 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             _ => vec![],
         };
         let text = Paragraph::new(text)
-            .block(match (&app.play.game_phase, app.play.is_held[i]) {
+            .block(match (&play.game_phase, play.is_held[i]) {
                 (GamePhase::Roll(..), ..) | (.., true) => Block::default().borders(Borders::ALL),
                 _ => Block::default(),
             })
@@ -152,6 +157,11 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 }
 
 fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let play = if let AppState::Play(play) = &app.state {
+        play
+    } else {
+        panic!()
+    };
     let block = Block::default().title("Dust").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -170,8 +180,8 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         ])
         .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in app.play.hand.get_dice().iter().enumerate() {
-        let text = match (&app.play.game_phase, app.play.is_held[i]) {
+    for (i, &d) in play.hand.get_dice().iter().enumerate() {
+        let text = match (&play.game_phase, play.is_held[i]) {
             (GamePhase::Roll(..), ..) | (.., true) => vec![],
             _ => vec![
                 Spans::from(Span::styled(
@@ -189,7 +199,7 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             ],
         };
         let text = Paragraph::new(text)
-            .block(match (&app.play.game_phase, app.play.is_held[i]) {
+            .block(match (&play.game_phase, play.is_held[i]) {
                 (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
                 _ => Block::default().borders(Borders::ALL),
             })
@@ -210,6 +220,11 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 }
 
 fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+    let play = if let AppState::Play(play) = &app.state {
+        play
+    } else {
+        panic!()
+    };
     let mut score_rows = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
@@ -219,8 +234,8 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                         (0..app.num_players)
                             .map(|pid| {
                                 let st = &app.scores[pid];
-                                let hand = &app.play.hand;
-                                let player = app.play.player_id;
+                                let hand = &play.hand;
+                                let player = play.player_id;
                                 let pos = CursorPos::Table(b);
 
                                 let text = if st.has_score_in(b) {
@@ -256,9 +271,9 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
             .into_iter()
             .chain((0..app.num_players).map(|pid| {
-                let dice = app.play.hand.get_dice();
+                let dice = play.hand.get_dice();
                 let st = &app.scores[pid];
-                let is_playing = pid == app.play.player_id;
+                let is_playing = pid == play.player_id;
 
                 let mut bstext = format!("{:>2}", "");
                 let mut bsstyle = Style::default();
@@ -298,9 +313,9 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
             .into_iter()
             .chain((0..app.num_players).map(|pid| {
-                let dice = app.play.hand.get_dice();
+                let dice = play.hand.get_dice();
                 let st = &app.scores[pid];
-                let is_playing = pid == app.play.player_id;
+                let is_playing = pid == play.player_id;
                 let total_score = st.get_total_score();
                 let mut text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let mut style = Style::default();
@@ -323,7 +338,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             (0..app.num_players)
                 .map(|pid| {
                     let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
-                    let style = if pid == app.play.player_id {
+                    let style = if pid == play.player_id {
                         Style::default().fg(Color::Black).bg(Color::LightYellow)
                     } else {
                         Style::default()
