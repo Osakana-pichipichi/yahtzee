@@ -4,7 +4,7 @@ use crate::scoring::{scoring, Boxes};
 use crate::InputEvent;
 use array_macro::array;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use enum_iterator::Sequence;
+use enum_iterator::{all, Sequence};
 
 #[derive(PartialEq, Eq)]
 pub enum AppReturn {
@@ -149,7 +149,12 @@ impl App {
                     self.cursor_pos = CursorPos::Hand(0);
                 } else {
                     play.game_phase = GamePhase::Select;
-                    self.cursor_pos = CursorPos::Table(Boxes::Aces);
+                    for pos in all::<Boxes>() {
+                        if !self.scores[play.player_id].has_score_in(pos) {
+                            self.cursor_pos = CursorPos::Table(pos);
+                            break;
+                        }
+                    }
                 }
 
                 AppReturn::Continue
@@ -265,14 +270,24 @@ impl App {
             }) => {
                 match self.cursor_pos {
                     CursorPos::Role => {
-                        self.cursor_pos = CursorPos::Table(Boxes::Aces);
+                        for pos in all::<Boxes>() {
+                        if !self.scores[play.player_id].has_score_in(pos) {
+                            self.cursor_pos = CursorPos::Table(pos);
+                            break;
+                        }
+                    }
                     }
                     CursorPos::Hand(pos) => {
                         let new_pos = pos + 1;
                         if new_pos < Hand::DICE_NUM {
                             self.cursor_pos = CursorPos::Hand(new_pos);
                         } else {
-                            self.cursor_pos = CursorPos::Table(Boxes::Aces);
+                            for pos in all::<Boxes>() {
+                        if !self.scores[play.player_id].has_score_in(pos) {
+                            self.cursor_pos = CursorPos::Table(pos);
+                            break;
+                        }
+                    }
                         }
                     }
                     CursorPos::Dust(pos) => {
@@ -280,7 +295,12 @@ impl App {
                         if new_pos < Hand::DICE_NUM {
                             self.cursor_pos = CursorPos::Dust(new_pos);
                         } else {
-                            self.cursor_pos = CursorPos::Table(Boxes::Aces);
+                            for pos in all::<Boxes>() {
+                        if !self.scores[play.player_id].has_score_in(pos) {
+                            self.cursor_pos = CursorPos::Table(pos);
+                            break;
+                        }
+                    }
                         }
                     }
                     _ => (),
@@ -302,8 +322,13 @@ impl App {
                         self.cursor_pos = CursorPos::Hand(pos);
                     }
                     CursorPos::Table(pos) => {
-                        if pos != Boxes::first().unwrap() {
-                            self.cursor_pos = CursorPos::Table(pos.previous().unwrap());
+                        let mut pos = pos;
+                        while let Some(prev) = pos.previous() {
+                            if !self.scores[play.player_id].has_score_in(prev) {
+                                self.cursor_pos = CursorPos::Table(prev);
+                                break;
+                            }
+                            pos = prev;
                         }
                     }
                     _ => (),
@@ -323,8 +348,13 @@ impl App {
                         self.cursor_pos = CursorPos::Dust(pos);
                     }
                     CursorPos::Table(pos) => {
-                        if pos != Boxes::last().unwrap() {
-                            self.cursor_pos = CursorPos::Table(pos.next().unwrap());
+                        let mut pos = pos;
+                        while let Some(next) = pos.next() {
+                            if !self.scores[play.player_id].has_score_in(next) {
+                                self.cursor_pos = CursorPos::Table(next);
+                                break;
+                            }
+                            pos = next;
                         }
                     }
                     _ => (),
@@ -404,8 +434,13 @@ impl App {
                         self.cursor_pos = CursorPos::Hand(pos);
                     }
                     CursorPos::Table(pos) => {
-                        if pos != Boxes::first().unwrap() {
-                            self.cursor_pos = CursorPos::Table(pos.previous().unwrap());
+                        let mut pos = pos;
+                        while let Some(prev) = pos.previous() {
+                            if !self.scores[play.player_id].has_score_in(prev) {
+                                self.cursor_pos = CursorPos::Table(prev);
+                                break;
+                            }
+                            pos = prev;
                         }
                     }
                     _ => (),
@@ -425,8 +460,13 @@ impl App {
                         self.cursor_pos = CursorPos::Dust(pos);
                     }
                     CursorPos::Table(pos) => {
-                        if pos != Boxes::last().unwrap() {
-                            self.cursor_pos = CursorPos::Table(pos.next().unwrap());
+                        let mut pos = pos;
+                        while let Some(next) = pos.next() {
+                            if !self.scores[play.player_id].has_score_in(next) {
+                                self.cursor_pos = CursorPos::Table(next);
+                                break;
+                            }
+                            pos = next;
                         }
                     }
                     _ => (),
