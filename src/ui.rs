@@ -258,15 +258,14 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                                     String::new()
                                 };
 
-                                let mut style = if app.cursor_pos == pos && pid == player {
-                                    Style::default().fg(Color::DarkGray).bg(Color::White)
+                                let style = if pid == player && !st.has_score_in(b) {
+                                    let mut style = Style::default().fg(Color::Yellow);
+                                    if app.cursor_pos == pos {
+                                        style = style.bg(Color::White);
+                                    }
+                                    style
                                 } else {
                                     Style::default()
-                                };
-                                style = if !st.has_score_in(b) && pid == player {
-                                    style.fg(Color::Yellow)
-                                } else {
-                                    style
                                 };
 
                                 Cell::from(text).style(style)
