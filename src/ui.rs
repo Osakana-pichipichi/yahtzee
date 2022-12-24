@@ -259,9 +259,9 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                                 };
 
                                 let style = if pid == player && !st.has_score_in(b) {
-                                    let mut style = Style::default().fg(Color::Yellow);
+                                    let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
                                     if app.cursor_pos == pos {
-                                        style = style.bg(Color::White);
+                                        style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
                                     }
                                     style
                                 } else {
@@ -296,7 +296,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     let score = scoring(b, dice);
                     if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
                         bstext = format!("{:>2}", score);
-                        bsstyle = bsstyle.fg(Color::Yellow);
+                        bsstyle = bsstyle.fg(Color::Rgb(255, 215, 0));
                     }
                 }
 
@@ -305,7 +305,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     let ifus = st.get_total_upper_score_if_filled_by(b, score);
                     if ifus > us {
                         ustext = format!("{:>3}", ifus);
-                        usstyle = usstyle.fg(Color::Yellow);
+                        usstyle = usstyle.fg(Color::Rgb(255, 215, 0));
                     }
                 }
 
@@ -334,7 +334,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     let if_total_score = st.get_total_score_if_filled_by(b, score);
                     if if_total_score > total_score {
                         text = format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH);
-                        style = style.fg(Color::Yellow);
+                        style = style.fg(Color::Rgb(255, 215, 0));
                     }
                 }
 
