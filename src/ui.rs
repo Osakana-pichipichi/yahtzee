@@ -412,7 +412,7 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let mut results = (0..app.num_players)
         .map(|i| (i, app.scores[i].get_total_score()))
         .collect::<Vec<_>>();
-    results.sort_by(|(.., left), (.., right)| left.cmp(right));
+    results.sort_by(|(.., left), (.., right)| left.cmp(right).reverse());
     let mut results = results
         .iter()
         .enumerate()
