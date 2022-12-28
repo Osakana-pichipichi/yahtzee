@@ -2,6 +2,7 @@ use crate::hand::Hand;
 use array_macro::array;
 use enum_iterator::Sequence;
 use std::collections::HashSet;
+use std::fmt;
 use std::iter::FromIterator;
 
 const FULL_HOUSE_SCORE: u32 = 25;
@@ -26,21 +27,23 @@ pub enum Boxes {
     Chance,
 }
 
-pub fn box_name(b: Boxes) -> &'static str {
-    match b {
-        Boxes::Aces => "Aces",
-        Boxes::Twos => "Twos",
-        Boxes::Threes => "Threes",
-        Boxes::Fours => "Fours",
-        Boxes::Fives => "Fives",
-        Boxes::Sixes => "Sixes",
-        Boxes::ThreeOfaAKind => "Three of a kind",
-        Boxes::FourOfaAKind => "Four of a kind",
-        Boxes::FullHouse => "Full house",
-        Boxes::SmallStraight => "Small straight",
-        Boxes::LargeStraight => "Large straight",
-        Boxes::Yahtzee => "Yahtzee",
-        Boxes::Chance => "Chance",
+impl fmt::Display for Boxes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Boxes::Aces => f.pad("Aces"),
+            Boxes::Twos => f.pad("Twos"),
+            Boxes::Threes => f.pad("Threes"),
+            Boxes::Fours => f.pad("Fours"),
+            Boxes::Fives => f.pad("Fives"),
+            Boxes::Sixes => f.pad("Sixes"),
+            Boxes::ThreeOfaAKind => f.pad("Three of a kind"),
+            Boxes::FourOfaAKind => f.pad("Four of a kind"),
+            Boxes::FullHouse => f.pad("Full house"),
+            Boxes::SmallStraight => f.pad("Small straight"),
+            Boxes::LargeStraight => f.pad("Large straight"),
+            Boxes::Yahtzee => f.pad("Yahtzee"),
+            Boxes::Chance => f.pad("Chance"),
+        }
     }
 }
 

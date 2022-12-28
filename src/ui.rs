@@ -1,7 +1,7 @@
 use crate::app::{App, AppState, CursorPos, GamePhase};
 use crate::hand::Hand;
 use crate::score_table::ScoreTable;
-use crate::scoring::{box_name, scoring, Boxes};
+use crate::scoring::{scoring, Boxes};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -238,7 +238,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let mut score_rows = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
-                vec![Cell::from(format!("{:>1$}", box_name(b), BOXES_CELL_WIDTH))]
+                vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
                     .into_iter()
                     .chain(
                         (0..app.num_players)
@@ -453,7 +453,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
     let mut score_rows = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
-                vec![Cell::from(format!("{:>1$}", box_name(b), BOXES_CELL_WIDTH))]
+                vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
                     .into_iter()
                     .chain(
                         (0..app.num_players)
