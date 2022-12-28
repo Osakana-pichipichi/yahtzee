@@ -415,14 +415,10 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     results.sort_by(|(.., left), (.., right)| left.cmp(right).reverse());
     let mut results = results
         .iter()
-        .enumerate()
-        .map(|(rank, (pid, ..))| {
+        .map(|(pid, score)| {
+            let rank = results.iter().position(|(.., s)| s == score).unwrap() + 1;
             Spans::from(Span::styled(
-                format!(
-                    "{:^1$}",
-                    format!("{}. Player{}", rank + 1, pid),
-                    width as usize
-                ),
+                format!("{:^1$}", format!("{}. Player{}", rank, pid), width as usize),
                 Style::default(),
             ))
         })
