@@ -6,7 +6,7 @@ mod scoring;
 mod ui;
 
 use crate::app::{App, AppReturn};
-use crate::events::{Events, InputEvent};
+use crate::events::Events;
 use crate::ui::draw_ui;
 use anyhow::Result;
 use crossterm::{

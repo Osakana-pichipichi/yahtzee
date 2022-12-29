@@ -1,9 +1,8 @@
+use crate::events::{Actions, InputEvent};
 use crate::hand::Hand;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
-use crate::InputEvent;
 use array_macro::array;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use enum_iterator::{all, Sequence};
 
 #[derive(PartialEq, Eq)]
@@ -98,17 +97,10 @@ impl App {
             panic!()
         };
 
-        match input_event {
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => AppReturn::Exit,
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Enter | KeyCode::Char(' '),
-                ..
-            }) => {
+            Actions::Select => {
                 play.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
                 play.game_phase = GamePhase::Roll(0);
                 self.cursor_pos = CursorPos::Role;
@@ -126,17 +118,10 @@ impl App {
             panic!()
         };
 
-        match input_event {
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => AppReturn::Exit,
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Enter | KeyCode::Char(' '),
-                ..
-            }) => {
+            Actions::Select => {
                 let count = if let GamePhase::Roll(count) = play.game_phase {
                     count + 1
                 } else {
@@ -183,17 +168,10 @@ impl App {
             panic!()
         };
 
-        match input_event {
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => AppReturn::Exit,
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Enter | KeyCode::Char(' '),
-                ..
-            }) => {
+            Actions::Select => {
                 match self.cursor_pos {
                     CursorPos::Role => {
                         let dice = play.hand.get_dice();
@@ -241,10 +219,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Left | KeyCode::Char('a'),
-                ..
-            }) => {
+            Actions::Left => {
                 match self.cursor_pos {
                     CursorPos::Hand(pos) => {
                         if pos > 0 {
@@ -264,10 +239,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Right | KeyCode::Char('d'),
-                ..
-            }) => {
+            Actions::Right => {
                 match self.cursor_pos {
                     CursorPos::Role => {
                         for pos in all::<Boxes>() {
@@ -308,10 +280,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Up | KeyCode::Char('w'),
-                ..
-            }) => {
+            Actions::Up => {
                 match self.cursor_pos {
                     CursorPos::Hand(..) => {
                         if !play.is_held.iter().all(|&x| x) {
@@ -336,10 +305,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Down | KeyCode::Char('s'),
-                ..
-            }) => {
+            Actions::Down => {
                 match self.cursor_pos {
                     CursorPos::Role => {
                         self.cursor_pos = CursorPos::Hand(0);
@@ -373,17 +339,10 @@ impl App {
             panic!()
         };
 
-        match input_event {
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => AppReturn::Exit,
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Enter | KeyCode::Char(' '),
-                ..
-            }) => {
+            Actions::Select => {
                 if let CursorPos::Table(pos) = self.cursor_pos {
                     let pid = play.player_id;
                     let score_table = &mut self.scores[pid];
@@ -403,10 +362,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Up | KeyCode::Char('w'),
-                ..
-            }) => {
+            Actions::Up => {
                 if let CursorPos::Table(pos) = self.cursor_pos {
                     let mut pos = pos;
                     while let Some(prev) = pos.previous() {
@@ -420,10 +376,7 @@ impl App {
                 AppReturn::Continue
             }
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Down | KeyCode::Char('s'),
-                ..
-            }) => {
+            Actions::Down => {
                 match self.cursor_pos {
                     CursorPos::Role => {
                         self.cursor_pos = CursorPos::Hand(0);
@@ -451,17 +404,10 @@ impl App {
     }
 
     fn do_action_in_result(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event {
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => AppReturn::Exit,
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
 
-            InputEvent::Input(KeyEvent {
-                code: KeyCode::Enter | KeyCode::Char(' '),
-                ..
-            }) => AppReturn::Exit,
+            Actions::Select => AppReturn::Exit,
 
             _ => AppReturn::Continue,
         }

@@ -1,14 +1,63 @@
-use crossterm::event::{poll, read, Event, KeyEvent};
+use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{
     sync::mpsc::{channel, Receiver, RecvError, Sender},
     thread,
     time::Duration,
 };
 
+pub enum Actions {
+    Select,
+    Up,
+    Down,
+    Right,
+    Left,
+    Exit,
+    Pass,
+}
+
 pub enum InputEvent {
     Input(KeyEvent),
     Resize(u16, u16),
     Tick,
+}
+
+impl InputEvent {
+    pub fn action(&self) -> Actions {
+        match self {
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Enter | KeyCode::Char(' '),
+                ..
+            }) => Actions::Select,
+
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Up | KeyCode::Char('w'),
+                ..
+            }) => Actions::Up,
+
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Down | KeyCode::Char('s'),
+                ..
+            }) => Actions::Down,
+
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Left | KeyCode::Char('a'),
+                ..
+            }) => Actions::Left,
+
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Right | KeyCode::Char('d'),
+                ..
+            }) => Actions::Right,
+
+            InputEvent::Input(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            }) => Actions::Exit,
+
+            _ => Actions::Pass,
+        }
+    }
 }
 
 pub struct Events {
