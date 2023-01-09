@@ -527,10 +527,10 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
 }
 
 fn create_centerd_rect(base_rect: Rect, width: u16, height: u16) -> Rect {
-    Rect {
-        x: base_rect.x + (base_rect.width - width) / 2,
-        y: base_rect.y + (base_rect.height - height) / 2,
+    Rect::new(
+        base_rect.x + (base_rect.width - width) / 2,
+        base_rect.y + (base_rect.height - height) / 2,
         width,
         height,
-    }
+    )
 }
