@@ -1,4 +1,3 @@
-use log::info;
 use rand::Rng;
 
 pub struct Hand {
@@ -30,15 +29,13 @@ impl Hand {
         self.dice.extend(elements.get_dice());
     }
 
-    pub fn remove_dice(&mut self, elements: &[u32]) {
-        for rm_val in elements.iter() {
-            if let Some(index) = self.dice.iter().rposition(|x| x == rm_val) {
-                self.dice.remove(index);
-            } else if Hand::PIPS.contains(rm_val) {
-                info!("There is no \"{}\" to be able to remove.", rm_val);
-            } else {
-                info!("Invalid pip value: {}", rm_val);
-            }
+    pub fn remove_dice(&mut self, removes: &[bool]) {
+        if removes.len() > self.dice.len() {
+            panic!("array length for removal is larger than holding dice length");
+        }
+
+        for (i, _) in removes.iter().enumerate().rev().filter(|&(_, &rm)| rm) {
+            self.dice.remove(i);
         }
     }
 
@@ -71,18 +68,26 @@ mod tests {
     #[test]
     fn remove_dice_test() {
         let mut h0 = Hand {
+            dice: vec![5, 3, 2, 3, 5],
+        };
+        h0.remove_dice(&[true, true, false, false, false]);
+        assert_eq!(h0.get_dice(), [2, 3, 5]);
+
+        let mut h0 = Hand {
             dice: vec![1, 3, 2, 3, 5],
         };
-        h0.remove_dice(&[3, 1]);
+        h0.remove_dice(&[true, false, false, true, false]);
         assert_eq!(h0.get_dice(), [3, 2, 5]);
+
         let mut h0 = Hand::new_with_random_n_dice(4);
-        let d = h0.get_dice();
-        let d = [d[0], d[2]];
+        let org = h0.get_dice().to_vec();
+        let d = [true, false, true];
         h0.remove_dice(&d);
         assert_eq!(h0.dice.len(), 2);
-        let d = h0.get_dice();
-        let d = [8, d[1]];
+        assert_eq!(h0.dice, [org[1], org[3]]);
+        let d = [false, true];
         h0.remove_dice(&d);
         assert_eq!(h0.dice.len(), 1);
+        assert_eq!(h0.dice, [org[1]]);
     }
 }

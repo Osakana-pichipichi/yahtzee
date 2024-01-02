@@ -46,16 +46,14 @@ impl Play {
     }
 
     pub fn reroll_dice(&mut self) -> usize {
-        let dice = self.hand.get_dice();
-        let removed_dice = dice
+        let removes = self
+            .is_held
             .iter()
-            .zip(self.is_held.iter())
-            .filter(|(.., &is_heled)| !is_heled)
-            .map(|(&d, ..)| d)
+            .map(|&is_heled| !is_heled)
             .collect::<Vec<_>>();
-        self.hand.remove_dice(&removed_dice);
+        self.hand.remove_dice(&removes);
 
-        let reroll_dices = removed_dice.len();
+        let reroll_dices = removes.iter().filter(|&&e| e).count();
         let rests = Hand::DICE_NUM - reroll_dices;
         self.is_held = array![i => i < rests; Hand::DICE_NUM];
         self.hand
