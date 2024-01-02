@@ -270,8 +270,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 
                                 Cell::from(text).style(style)
                             })
-                            .collect::<Vec<_>>()
-                            .into_iter(),
+                            .collect::<Vec<_>>(),
                     ),
             )
         })
@@ -354,8 +353,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     };
                     Cell::from(text).style(style)
                 })
-                .collect::<Vec<_>>()
-                .into_iter(),
+                .collect::<Vec<_>>(),
         ),
     );
     let score_table_width = (0..(app.num_players + 1))
@@ -460,8 +458,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
 
                                 Cell::from(text).style(Style::default())
                             })
-                            .collect::<Vec<_>>()
-                            .into_iter(),
+                            .collect::<Vec<_>>(),
                     ),
             )
         })
@@ -503,8 +500,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
 
                     Cell::from(text).style(Style::default())
                 })
-                .collect::<Vec<_>>()
-                .into_iter(),
+                .collect::<Vec<_>>(),
         ),
     );
     let score_table_width = (0..(app.num_players + 1))
