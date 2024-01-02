@@ -4,7 +4,7 @@ use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
 use array_macro::array;
-use enum_iterator::{all, Sequence};
+use enum_iterator::{all, first, last, Sequence};
 use thiserror::Error;
 
 #[derive(PartialEq, Eq)]
@@ -273,11 +273,13 @@ impl App {
     }
 
     fn up_action_in_score_table(&mut self) {
-        if let CursorPos::Table(pos) = self.cursor_pos {
-            let mut pos = pos;
-            while let Some(prev) = pos.previous() {
+        if let CursorPos::Table(init_pos) = self.cursor_pos {
+            let mut pos = init_pos;
+            loop {
+                let prev = pos.previous().unwrap_or_else(|| last::<Boxes>().unwrap());
                 let pid = self.get_play_data().unwrap().player_id;
-                if !self.get_game_data().get_score_table(pid).has_score_in(prev) {
+                let has_score = self.get_game_data().get_score_table(pid).has_score_in(prev);
+                if !has_score || prev == init_pos {
                     self.cursor_pos = CursorPos::Table(prev);
                     break;
                 }
@@ -289,11 +291,13 @@ impl App {
     }
 
     fn down_action_in_score_table(&mut self) {
-        if let CursorPos::Table(pos) = self.cursor_pos {
-            let mut pos = pos;
-            while let Some(next) = pos.next() {
+        if let CursorPos::Table(init_pos) = self.cursor_pos {
+            let mut pos = init_pos;
+            loop {
+                let next = pos.next().unwrap_or_else(|| first::<Boxes>().unwrap());
                 let pid = self.get_play_data().unwrap().player_id;
-                if !self.get_game_data().get_score_table(pid).has_score_in(next) {
+                let has_score = self.get_game_data().get_score_table(pid).has_score_in(next);
+                if !has_score || next == init_pos {
                     self.cursor_pos = CursorPos::Table(next);
                     break;
                 }
