@@ -48,11 +48,11 @@ impl fmt::Display for Boxes {
 }
 
 pub fn scoring(b: Boxes, dice: &[u32]) -> u32 {
-    if dice.len() != Hand::DICE_NUM {
+    if dice.len() > Hand::DICE_NUM {
         panic!(
-            "A hand needs {} dice, but your hand has only {} dice.",
-            Hand::DICE_NUM,
-            dice.len()
+            "your hand ({} dice) is larger than {} dice.",
+            dice.len(),
+            Hand::DICE_NUM
         );
     }
     match b {
