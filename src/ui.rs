@@ -1,5 +1,4 @@
-use crate::app::{App, AppState, CursorPos, GamePhase};
-use crate::hand::Hand;
+use crate::app::{App, AppState, AppStateError, CursorPos, GamePhase};
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
 use tui::{
@@ -101,138 +100,153 @@ fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 }
 
 fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
-    let play = if let AppState::Play(play) = &app.state {
-        play
-    } else {
-        panic!()
-    };
-
     let block = Block::default().title("Dice").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    let dice_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-        ])
-        .split(create_centerd_rect(chunk, 39, 5));
+    match app.get_play_data() {
+        Ok(play) => {
+            for (i, &d) in play.hand.get_dice().iter().enumerate() {
+                let dice_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(7),
+                        Constraint::Length(1),
+                        Constraint::Length(7),
+                        Constraint::Length(1),
+                        Constraint::Length(7),
+                        Constraint::Length(1),
+                        Constraint::Length(7),
+                        Constraint::Length(1),
+                        Constraint::Length(7),
+                    ])
+                    .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in play.hand.get_dice().iter().enumerate() {
-        let text = match (&play.game_phase, play.is_held[i]) {
-            (GamePhase::Roll(..), ..) | (.., true) => vec![
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][0],
-                    Style::default(),
-                )),
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][1],
-                    Style::default(),
-                )),
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][2],
-                    Style::default(),
-                )),
-            ],
-            _ => vec![],
-        };
-        let text = Paragraph::new(text)
-            .block(match (&play.game_phase, play.is_held[i]) {
-                (GamePhase::Roll(..), ..) | (.., true) => Block::default().borders(Borders::ALL),
-                _ => Block::default(),
-            })
-            .style(match app.cursor_pos {
-                CursorPos::Hand(pos) => {
-                    if i == pos {
-                        Style::default().fg(Color::DarkGray).bg(Color::White)
-                    } else {
-                        Style::default()
-                    }
-                }
+                let text = match (&play.game_phase, play.is_held[i]) {
+                    (GamePhase::Roll(..), ..) | (.., true) => vec![
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][0],
+                            Style::default(),
+                        )),
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][1],
+                            Style::default(),
+                        )),
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][2],
+                            Style::default(),
+                        )),
+                    ],
+                    _ => vec![],
+                };
+                let text = Paragraph::new(text)
+                    .block(match (&play.game_phase, play.is_held[i]) {
+                        (GamePhase::Roll(..), ..) | (.., true) => {
+                            Block::default().borders(Borders::ALL)
+                        }
+                        _ => Block::default(),
+                    })
+                    .style(match app.cursor_pos {
+                        CursorPos::Hand(pos) => {
+                            if i == pos {
+                                Style::default().fg(Color::DarkGray).bg(Color::White)
+                            } else {
+                                Style::default()
+                            }
+                        }
 
-                _ => Style::default(),
-            })
-            .alignment(Alignment::Center);
-        f.render_widget(text, dice_chunks[2 * i]);
+                        _ => Style::default(),
+                    })
+                    .alignment(Alignment::Center);
+                f.render_widget(text, dice_chunks[2 * i]);
+            }
+        }
+        Err(e) => match e.downcast_ref::<AppStateError>().unwrap() {
+            AppStateError::NoPlayData | AppStateError::UnexpectedState => {}
+            _ => panic!("{}", e),
+        },
     }
 }
 
 fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
-    let play = if let AppState::Play(play) = &app.state {
-        play
-    } else {
-        panic!()
-    };
-
     let block = Block::default().title("Dust").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    let dice_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-            Constraint::Length(1),
-            Constraint::Length(7),
-        ])
-        .split(create_centerd_rect(chunk, 39, 5));
+    match app.get_play_data() {
+        Ok(play) => {
+            let dice_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Length(7),
+                    Constraint::Length(1),
+                    Constraint::Length(7),
+                    Constraint::Length(1),
+                    Constraint::Length(7),
+                    Constraint::Length(1),
+                    Constraint::Length(7),
+                    Constraint::Length(1),
+                    Constraint::Length(7),
+                ])
+                .split(create_centerd_rect(chunk, 39, 5));
 
-    for (i, &d) in play.hand.get_dice().iter().enumerate() {
-        let text = match (&play.game_phase, play.is_held[i]) {
-            (GamePhase::Roll(..), ..) | (.., true) => vec![],
-            _ => vec![
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][0],
-                    Style::default(),
-                )),
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][1],
-                    Style::default(),
-                )),
-                Spans::from(Span::styled(
-                    DICE_STR[(d - 1) as usize][2],
-                    Style::default(),
-                )),
-            ],
-        };
-        let text = Paragraph::new(text)
-            .block(match (&play.game_phase, play.is_held[i]) {
-                (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
-                _ => Block::default().borders(Borders::ALL),
-            })
-            .style(match app.cursor_pos {
-                CursorPos::Dust(pos) => {
-                    if i == pos {
-                        Style::default().fg(Color::DarkGray).bg(Color::White)
-                    } else {
-                        Style::default()
-                    }
-                }
+            for (i, &d) in play.hand.get_dice().iter().enumerate() {
+                let text = match (&play.game_phase, play.is_held[i]) {
+                    (GamePhase::Roll(..), ..) | (.., true) => vec![],
+                    _ => vec![
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][0],
+                            Style::default(),
+                        )),
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][1],
+                            Style::default(),
+                        )),
+                        Spans::from(Span::styled(
+                            DICE_STR[(d - 1) as usize][2],
+                            Style::default(),
+                        )),
+                    ],
+                };
+                let text = Paragraph::new(text)
+                    .block(match (&play.game_phase, play.is_held[i]) {
+                        (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
+                        _ => Block::default().borders(Borders::ALL),
+                    })
+                    .style(match app.cursor_pos {
+                        CursorPos::Dust(pos) => {
+                            if i == pos {
+                                Style::default().fg(Color::DarkGray).bg(Color::White)
+                            } else {
+                                Style::default()
+                            }
+                        }
 
-                _ => Style::default(),
-            })
-            .alignment(Alignment::Center);
-        f.render_widget(text, dice_chunks[2 * i]);
+                        _ => Style::default(),
+                    })
+                    .alignment(Alignment::Center);
+                f.render_widget(text, dice_chunks[2 * i]);
+            }
+        }
+        Err(e) => match e.downcast_ref::<AppStateError>().unwrap() {
+            AppStateError::NoPlayData | AppStateError::UnexpectedState => {}
+            _ => panic!("{}", e),
+        },
     }
 }
 
 fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
-    let play = if let AppState::Play(play) = &app.state {
-        play
-    } else {
-        panic!()
+    let play = app.get_play_data();
+
+    let is_playing = |pid: usize| -> bool {
+        match play {
+            Ok(play) => pid == play.player_id,
+            _ => false,
+        }
+    };
+    let dislay_dice = |pid: usize| -> Option<&[u32]> {
+        match play {
+            Ok(p) if is_playing(pid) => Some(p.hand.get_dice()),
+            _ => None,
+        }
     };
 
     let mut score_rows = enum_iterator::all::<Boxes>()
@@ -241,24 +255,22 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                 vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
                     .into_iter()
                     .chain(
-                        (0..app.num_players)
+                        (0..app.get_game_data().get_num_players())
                             .map(|pid| {
-                                let st = &app.scores[pid];
-                                let hand = &play.hand;
-                                let player = play.player_id;
+                                let st = &app.get_game_data().get_score_table(pid);
+                                let is_playing = is_playing(pid);
+                                let dice = dislay_dice(pid);
                                 let pos = CursorPos::Table(b);
 
                                 let text = if st.has_score_in(b) {
                                     format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
-                                } else if hand.get_dice().len() < Hand::DICE_NUM {
-                                    String::new()
-                                } else if pid == player {
-                                    format!("{:>1$}", scoring(b, hand.get_dice()), SCORE_CELL_WIDTH)
+                                } else if let Some(d) = dice {
+                                    format!("{:>1$}", scoring(b, d), SCORE_CELL_WIDTH)
                                 } else {
                                     String::new()
                                 };
 
-                                let style = if pid == player && !st.has_score_in(b) {
+                                let style = if is_playing && !st.has_score_in(b) {
                                     let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
                                     if app.cursor_pos == pos {
                                         style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
@@ -278,10 +290,11 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let bonus_cell = Row::new(
         vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
             .into_iter()
-            .chain((0..app.num_players).map(|pid| {
-                let dice = play.hand.get_dice();
-                let st = &app.scores[pid];
-                let is_playing = pid == play.player_id;
+            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
+                let st = &app.get_game_data().get_score_table(pid);
+                let is_playing = is_playing(pid);
+                let dice = dislay_dice(pid);
+                let pos = &app.cursor_pos;
 
                 let mut bstext = format!("{:>2}", "");
                 let mut bsstyle = Style::default();
@@ -291,16 +304,16 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 
                 if let Some(score) = st.calculate_bonus() {
                     bstext = format!("{:>2}", score);
-                } else if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
-                    let score = scoring(b, dice);
+                } else if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
+                    let score = scoring(b, d);
                     if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
                         bstext = format!("{:>2}", score);
                         bsstyle = bsstyle.fg(Color::Rgb(255, 215, 0));
                     }
                 }
 
-                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
-                    let score = scoring(b, dice);
+                if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
+                    let score = scoring(b, d);
                     let ifus = st.get_total_upper_score_if_filled_by(b, score);
                     if ifus > us {
                         ustext = format!("{:>3}", ifus);
@@ -320,15 +333,16 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let total_cell = Row::new(
         vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
             .into_iter()
-            .chain((0..app.num_players).map(|pid| {
-                let dice = play.hand.get_dice();
-                let st = &app.scores[pid];
-                let is_playing = pid == play.player_id;
+            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
+                let st = &app.get_game_data().get_score_table(pid);
+                let is_playing = is_playing(pid);
+                let dice = dislay_dice(pid);
+                let pos = &app.cursor_pos;
                 let total_score = st.get_total_score();
                 let mut text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let mut style = Style::default();
-                if let (&CursorPos::Table(b), true) = (&app.cursor_pos, is_playing) {
-                    let score = scoring(b, dice);
+                if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
+                    let score = scoring(b, d);
 
                     let if_total_score = st.get_total_score_if_filled_by(b, score);
                     if if_total_score > total_score {
@@ -343,10 +357,10 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     score_rows.push(total_cell);
     let score_header = Row::new(
         vec![Cell::from(String::from(""))].into_iter().chain(
-            (0..app.num_players)
+            (0..app.get_game_data().get_num_players())
                 .map(|pid| {
                     let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
-                    let style = if pid == play.player_id {
+                    let style = if is_playing(pid) {
                         Style::default().fg(Color::Black).bg(Color::LightYellow)
                     } else {
                         Style::default()
@@ -356,7 +370,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                 .collect::<Vec<_>>(),
         ),
     );
-    let score_table_width = (0..(app.num_players + 1))
+    let score_table_width = (0..(app.get_game_data().get_num_players() + 1))
         .map(|x| {
             Constraint::Length(if x == 0 {
                 BOXES_CELL_WIDTH as u16
@@ -399,7 +413,7 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     let block = Block::default().borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    let height = (app.num_players as u16) + 2;
+    let height = (app.get_game_data().get_num_players() as u16) + 2;
     let width = chunk.width - 4;
 
     let text_chunk = Layout::default()
@@ -407,8 +421,8 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         .constraints([Constraint::Percentage(100)])
         .split(create_centerd_rect(chunk, width + 2, height + 2));
 
-    let mut results = (0..app.num_players)
-        .map(|i| (i, app.scores[i].get_total_score()))
+    let mut results = (0..app.get_game_data().get_num_players())
+        .map(|i| (i, app.get_game_data().get_score_table(i).get_total_score()))
         .collect::<Vec<_>>();
     results.sort_by(|(.., left), (.., right)| left.cmp(right).reverse());
     let mut results = results
@@ -450,9 +464,9 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
                 vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
                     .into_iter()
                     .chain(
-                        (0..app.num_players)
+                        (0..app.get_game_data().get_num_players())
                             .map(|pid| {
-                                let st = &app.scores[pid];
+                                let st = app.get_game_data().get_score_table(pid);
                                 let score = st.get_score(b).unwrap();
                                 let text = format!("{:>1$}", score, SCORE_CELL_WIDTH);
 
@@ -466,8 +480,8 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
     let bonus_cell = Row::new(
         vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
             .into_iter()
-            .chain((0..app.num_players).map(|pid| {
-                let st = &app.scores[pid];
+            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
+                let st = &app.get_game_data().get_score_table(pid);
                 let bstext = format!("{:>2}", st.calculate_bonus().unwrap());
                 let ustext = format!("{:>3}", st.get_total_upper_score());
 
@@ -483,8 +497,8 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
     let total_cell = Row::new(
         vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
             .into_iter()
-            .chain((0..app.num_players).map(|pid| {
-                let st = &app.scores[pid];
+            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
+                let st = &app.get_game_data().get_score_table(pid);
                 let total_score = st.get_total_score();
                 let text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
 
@@ -494,7 +508,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
     score_rows.push(total_cell);
     let score_header = Row::new(
         vec![Cell::from(String::from(""))].into_iter().chain(
-            (0..app.num_players)
+            (0..app.get_game_data().get_num_players())
                 .map(|pid| {
                     let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
 
@@ -503,7 +517,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
                 .collect::<Vec<_>>(),
         ),
     );
-    let score_table_width = (0..(app.num_players + 1))
+    let score_table_width = (0..(app.get_game_data().get_num_players() + 1))
         .map(|x| {
             Constraint::Length(if x == 0 {
                 BOXES_CELL_WIDTH as u16

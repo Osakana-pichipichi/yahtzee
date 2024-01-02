@@ -87,6 +87,13 @@ impl ScoreTable {
             .all(|x| x)
     }
 
+    pub fn get_num_filled_scores(&self) -> usize {
+        self.table
+            .iter()
+            .filter(|(.., row)| row.is_filled())
+            .count()
+    }
+
     pub fn confirm_score(&mut self, b: Boxes, score: u32) {
         self.table.get_mut(&b).unwrap().fill(score);
     }
