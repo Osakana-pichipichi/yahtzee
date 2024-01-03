@@ -1,4 +1,5 @@
 use crate::app::{App, AppState, AppStateError, CursorPos, GamePhase};
+use crate::hand::Hand;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
 use ratatui::{
@@ -9,9 +10,12 @@ use ratatui::{
     Frame,
 };
 
+const DICE_KINDS: usize = 6;
+const DICE_STR_HEIGHT: usize = 3;
+
 #[rustfmt::skip]
 /* Skip rustfmt for a clearer view of how it will appear on the screen */
-const DICE_STR: [[&str; 3]; 6] = [
+const DICE_STR: [[&str; DICE_STR_HEIGHT]; DICE_KINDS] = [
     [
         "     ",
         "  *  ",
@@ -44,8 +48,30 @@ const DICE_STR: [[&str; 3]; 6] = [
     ],
 ];
 
+const DICE_STR_WIDTH: usize = {
+    let width = DICE_STR[0][0].len();
+
+    /* check the length for each elemnts */
+    let mut d = 0;
+    while d < DICE_KINDS {
+        let mut h = 0;
+        while h < DICE_STR_HEIGHT {
+            if DICE_STR[d][h].len() != width {
+                panic!("length of dice strings are not aligned.");
+            }
+            h += 1;
+        }
+        d += 1;
+    }
+
+    width
+};
 const BOXES_CELL_WIDTH: usize = 20;
 const SCORE_CELL_WIDTH: usize = 11;
+
+const DICE_MARGIN: u16 = 1;
+const HAND_MARGIN: u16 = 1;
+const DUST_MARGIN: u16 = 1;
 
 pub fn draw_ui(f: &mut Frame, app: &App) {
     match app.state {
@@ -105,20 +131,24 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
     match app.get_play_data() {
         Ok(play) => {
             for (i, &d) in play.hand.get_dice().iter().enumerate() {
+                let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
+                let dice_num = Hand::DICE_NUM as u16;
+                let rect_width = dice_width * dice_num + HAND_MARGIN * (dice_num - 1);
+                let rect_height = DICE_STR_HEIGHT as u16 + HAND_MARGIN * 2;
                 let dice_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([
-                        Constraint::Length(7),
-                        Constraint::Length(1),
-                        Constraint::Length(7),
-                        Constraint::Length(1),
-                        Constraint::Length(7),
-                        Constraint::Length(1),
-                        Constraint::Length(7),
-                        Constraint::Length(1),
-                        Constraint::Length(7),
+                        Constraint::Length(dice_width),
+                        Constraint::Length(HAND_MARGIN),
+                        Constraint::Length(dice_width),
+                        Constraint::Length(HAND_MARGIN),
+                        Constraint::Length(dice_width),
+                        Constraint::Length(HAND_MARGIN),
+                        Constraint::Length(dice_width),
+                        Constraint::Length(HAND_MARGIN),
+                        Constraint::Length(dice_width),
                     ])
-                    .split(create_centerd_rect(chunk, 39, 5));
+                    .split(create_centerd_rect(chunk, rect_width, rect_height));
 
                 let text = match (&play.game_phase, play.is_held[i]) {
                     (GamePhase::Roll(..), ..) | (.., true) => vec![
@@ -172,20 +202,24 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
 
     match app.get_play_data() {
         Ok(play) => {
+            let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
+            let dice_num = Hand::DICE_NUM as u16;
+            let rect_width = dice_width * dice_num + DUST_MARGIN * (dice_num - 1);
+            let rect_height = DICE_STR_HEIGHT as u16 + DUST_MARGIN * 2;
             let dice_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Length(7),
-                    Constraint::Length(1),
-                    Constraint::Length(7),
-                    Constraint::Length(1),
-                    Constraint::Length(7),
-                    Constraint::Length(1),
-                    Constraint::Length(7),
-                    Constraint::Length(1),
-                    Constraint::Length(7),
+                    Constraint::Length(dice_width),
+                    Constraint::Length(DUST_MARGIN),
+                    Constraint::Length(dice_width),
+                    Constraint::Length(DUST_MARGIN),
+                    Constraint::Length(dice_width),
+                    Constraint::Length(DUST_MARGIN),
+                    Constraint::Length(dice_width),
+                    Constraint::Length(DUST_MARGIN),
+                    Constraint::Length(dice_width),
                 ])
-                .split(create_centerd_rect(chunk, 39, 5));
+                .split(create_centerd_rect(chunk, rect_width, rect_height));
 
             for (i, &d) in play.hand.get_dice().iter().enumerate() {
                 let text = match (&play.game_phase, play.is_held[i]) {
