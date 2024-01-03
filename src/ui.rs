@@ -17,34 +17,34 @@ const DICE_STR_HEIGHT: usize = 3;
 /* Skip rustfmt for a clearer view of how it will appear on the screen */
 const DICE_STR: [[&str; DICE_STR_HEIGHT]; DICE_KINDS] = [
     [
-        "     ",
-        "  *  ",
-        "     ",
+        "       ",
+        "   *   ",
+        "       ",
     ],
     [
-        " *   ",
-        "     ",
-        "   * "
+        " *     ",
+        "       ",
+        "     * ",
     ],
     [
-        " *   ",
-        "  *  ",
-        "   * ",
+        " *     ",
+        "   *   ",
+        "     * ",
     ],
     [
-        " * * ",
-        "     ",
-        " * * ",
+        " *   * ",
+        "       ",
+        " *   * ",
     ],
     [
-        " * * ",
-        "  *  ",
-        " * * ",
+        " *   * ",
+        "   *   ",
+        " *   * ",
     ],
     [
-        " * * ",
-        " * * ",
-        " * * ",
+        " *   * ",
+        " *   * ",
+        " *   * ",
     ],
 ];
 
@@ -84,7 +84,7 @@ fn draw_play_ui(f: &mut Frame, app: &App) {
     /* Distribute the screen */
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(f.size());
 
     draw_playing_ground(f, app, chunks[0]);
@@ -429,7 +429,7 @@ fn draw_result_ui(f: &mut Frame, app: &App) {
     /* Distribute the screen */
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(f.size());
 
     draw_result(f, app, chunks[0]);
