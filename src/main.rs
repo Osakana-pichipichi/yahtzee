@@ -14,8 +14,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{cell::RefCell, env, io, rc::Rc, time::Duration};
-use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
     enable_raw_mode()?;

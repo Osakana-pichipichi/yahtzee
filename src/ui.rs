@@ -1,11 +1,10 @@
 use crate::app::{App, AppState, AppStateError, CursorPos, GamePhase};
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
     Frame,
 };
@@ -48,14 +47,14 @@ const DICE_STR: [[&str; 3]; 6] = [
 const BOXES_CELL_WIDTH: usize = 20;
 const SCORE_CELL_WIDTH: usize = 11;
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+pub fn draw_ui(f: &mut Frame, app: &App) {
     match app.state {
         AppState::Play(..) => draw_play_ui(f, app),
         AppState::Result => draw_result_ui(f, app),
     }
 }
 
-fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_play_ui(f: &mut Frame, app: &App) {
     /* Distribute the screen */
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -66,7 +65,7 @@ fn draw_play_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     draw_score_table(f, app, chunks[1]);
 }
 
-fn draw_playing_ground<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_playing_ground(f: &mut Frame, app: &App, chunk: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -81,7 +80,7 @@ fn draw_playing_ground<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     draw_dust_block(f, app, chunks[2]);
 }
 
-fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_role_block(f: &mut Frame, app: &App, chunk: Rect) {
     let block = Block::default().title("Role").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -89,7 +88,7 @@ fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(100)])
         .split(create_centerd_rect(chunk, 13, 3));
-    let text = Paragraph::new(Spans::from(Span::styled("Role!", Style::default())))
+    let text = Paragraph::new(Line::from(Span::styled("Role!", Style::default())))
         .block(Block::default().borders(Borders::ALL))
         .style(match app.cursor_pos {
             CursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
@@ -99,7 +98,7 @@ fn draw_role_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     f.render_widget(text, role_button_chunk[0]);
 }
 
-fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
     let block = Block::default().title("Dice").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -123,15 +122,15 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
 
                 let text = match (&play.game_phase, play.is_held[i]) {
                     (GamePhase::Roll(..), ..) | (.., true) => vec![
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][0],
                             Style::default(),
                         )),
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][1],
                             Style::default(),
                         )),
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][2],
                             Style::default(),
                         )),
@@ -167,7 +166,7 @@ fn draw_hand_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     }
 }
 
-fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
     let block = Block::default().title("Dust").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
@@ -192,15 +191,15 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                 let text = match (&play.game_phase, play.is_held[i]) {
                     (GamePhase::Roll(..), ..) | (.., true) => vec![],
                     _ => vec![
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][0],
                             Style::default(),
                         )),
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][1],
                             Style::default(),
                         )),
-                        Spans::from(Span::styled(
+                        Line::from(Span::styled(
                             DICE_STR[(d - 1) as usize][2],
                             Style::default(),
                         )),
@@ -233,7 +232,7 @@ fn draw_dust_block<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     }
 }
 
-fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
     let play = app.get_play_data();
 
     let is_playing = |pid: usize| -> bool {
@@ -321,7 +320,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
                     }
                 }
 
-                Cell::from(Spans::from(vec![
+                Cell::from(Line::from(vec![
                     Span::styled(bstext, bsstyle),
                     Span::raw(" ("),
                     Span::styled(ustext, usstyle),
@@ -379,7 +378,7 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
             })
         })
         .collect::<Vec<_>>();
-    let score_block = Table::new(score_rows)
+    let score_block = Table::new(score_rows, &score_table_width)
         .style(
             Style::default()
                 .fg(Color::White)
@@ -387,13 +386,12 @@ fn draw_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         )
         .header(score_header)
         .block(Block::default().title("SCORE").borders(Borders::ALL))
-        .widths(&score_table_width)
         .column_spacing(1);
 
     f.render_widget(score_block, chunk);
 }
 
-fn draw_result_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_result_ui(f: &mut Frame, app: &App) {
     /* Distribute the screen */
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -404,7 +402,7 @@ fn draw_result_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     draw_result_score_table(f, app, chunks[1]);
 }
 
-fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
     match app.state {
         AppState::Result => (),
         _ => panic!(),
@@ -429,15 +427,15 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
         .iter()
         .map(|(pid, score)| {
             let rank = results.iter().position(|(.., s)| s == score).unwrap() + 1;
-            Spans::from(Span::styled(
+            Line::from(Span::styled(
                 format!("{:^1$}", format!("{}. Player{}", rank, pid), width as usize),
                 Style::default(),
             ))
         })
         .collect::<Vec<_>>();
     results.extend([
-        Spans::from(Span::raw("")),
-        Spans::from(Span::styled(
+        Line::from(Span::raw("")),
+        Line::from(Span::styled(
             format!("{:^1$}", "Press ENTER to exit.", width as usize),
             Style::default(),
         )),
@@ -452,7 +450,7 @@ fn draw_result<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
     f.render_widget(text, text_chunk[0]);
 }
 
-fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) {
+fn draw_result_score_table(f: &mut Frame, app: &App, chunk: Rect) {
     match app.state {
         AppState::Result => (),
         _ => panic!(),
@@ -485,7 +483,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
                 let bstext = format!("{:>2}", st.calculate_bonus().unwrap());
                 let ustext = format!("{:>3}", st.get_total_upper_score());
 
-                Cell::from(Spans::from(vec![
+                Cell::from(Line::from(vec![
                     Span::styled(bstext, Style::default()),
                     Span::raw(" ("),
                     Span::styled(ustext, Style::default()),
@@ -526,7 +524,7 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
             })
         })
         .collect::<Vec<_>>();
-    let score_block = Table::new(score_rows)
+    let score_block = Table::new(score_rows, &score_table_width)
         .style(
             Style::default()
                 .fg(Color::White)
@@ -534,7 +532,6 @@ fn draw_result_score_table<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect)
         )
         .header(score_header)
         .block(Block::default().title("SCORE").borders(Borders::ALL))
-        .widths(&score_table_width)
         .column_spacing(1);
 
     f.render_widget(score_block, chunk);
