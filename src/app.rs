@@ -15,7 +15,7 @@ pub enum AppReturn {
 
 #[derive(PartialEq, Eq)]
 pub enum PlayCursorPos {
-    Role,
+    Roll,
     Hand(usize),
     Dust(usize),
     Table(Boxes),
@@ -183,7 +183,7 @@ impl App {
         match &self.state {
             AppState::Play(p, ..) => {
                 if p.is_none() {
-                    self.state = AppState::Play(Some(Play::new(player_id)), PlayCursorPos::Role);
+                    self.state = AppState::Play(Some(Play::new(player_id)), PlayCursorPos::Roll);
                     self.get_play_data()
                 } else {
                     Err(anyhow!(AppStateError::ExistPlayData))
@@ -250,7 +250,7 @@ impl App {
             _ => {
                 let pid = self.get_game_data().current_player_id();
                 self.initialize_play_data(pid).unwrap();
-                self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
+                self.set_play_cursor_pos(PlayCursorPos::Roll).unwrap();
                 AppReturn::Continue
             }
         }
@@ -362,7 +362,7 @@ impl App {
 
                 let next_score_table = self.get_game_data().get_score_table(next_pid);
                 if !next_score_table.has_all_scores() {
-                    self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
+                    self.set_play_cursor_pos(PlayCursorPos::Roll).unwrap();
                 } else {
                     self.state = AppState::Result;
                 }
@@ -378,7 +378,7 @@ impl App {
 
             Actions::Select => {
                 match self.get_play_cursor_pos().unwrap() {
-                    PlayCursorPos::Role => {
+                    PlayCursorPos::Roll => {
                         let play = self.get_mut_play_data().unwrap();
                         if !play.is_held.iter().all(|&x| x) {
                             play.reroll_dice();
@@ -427,7 +427,7 @@ impl App {
 
             Actions::Right => {
                 match self.get_play_cursor_pos().unwrap() {
-                    PlayCursorPos::Role => {
+                    PlayCursorPos::Roll => {
                         self.move_cursor_pos_to_table();
                     }
                     PlayCursorPos::Hand(pos) => {
@@ -458,7 +458,7 @@ impl App {
                     PlayCursorPos::Hand(..) => {
                         let play = self.get_play_data().unwrap();
                         if !play.is_held.iter().all(|&x| x) {
-                            self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
+                            self.set_play_cursor_pos(PlayCursorPos::Roll).unwrap();
                         }
                     }
                     &PlayCursorPos::Dust(pos) => {
@@ -474,7 +474,7 @@ impl App {
 
             Actions::Down => {
                 match self.get_play_cursor_pos().unwrap() {
-                    PlayCursorPos::Role => {
+                    PlayCursorPos::Roll => {
                         self.set_play_cursor_pos(PlayCursorPos::Hand(0)).unwrap();
                     }
                     &PlayCursorPos::Hand(pos) => {

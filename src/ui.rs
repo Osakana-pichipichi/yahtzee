@@ -101,27 +101,27 @@ fn draw_playing_ground(f: &mut Frame, app: &App, chunk: Rect) {
         ])
         .split(chunk);
 
-    draw_role_block(f, app, chunks[0]);
+    draw_roll_block(f, app, chunks[0]);
     draw_hand_block(f, app, chunks[1]);
     draw_dust_block(f, app, chunks[2]);
 }
 
-fn draw_role_block(f: &mut Frame, app: &App, chunk: Rect) {
-    let block = Block::default().title("Role").borders(Borders::ALL);
+fn draw_roll_block(f: &mut Frame, app: &App, chunk: Rect) {
+    let block = Block::default().title("Roll").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    let role_button_chunk = Layout::default()
+    let roll_button_chunk = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(100)])
         .split(create_centerd_rect(chunk, 13, 3));
-    let text = Paragraph::new(Line::from(Span::styled("Role!", Style::default())))
+    let text = Paragraph::new(Line::from(Span::styled("Roll!", Style::default())))
         .block(Block::default().borders(Borders::ALL))
         .style(match app.get_play_cursor_pos().unwrap() {
-            PlayCursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
+            PlayCursorPos::Roll => Style::default().fg(Color::DarkGray).bg(Color::White),
             _ => Style::default(),
         })
         .alignment(Alignment::Center);
-    f.render_widget(text, role_button_chunk[0]);
+    f.render_widget(text, roll_button_chunk[0]);
 }
 
 fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
