@@ -279,7 +279,6 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                                 let st = &app.get_game_data().get_score_table(pid);
                                 let is_playing = is_playing(pid);
                                 let dice = dislay_dice(pid);
-                                let pos = CursorPos::Table(b);
 
                                 let text = if st.has_score_in(b) {
                                     format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
@@ -291,7 +290,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
 
                                 let style = if is_playing && !st.has_score_in(b) {
                                     let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
-                                    if app.cursor_pos == pos {
+                                    if app.cursor_pos == CursorPos::Table(b) {
                                         style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
                                     }
                                     style
@@ -315,30 +314,40 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let dice = dislay_dice(pid);
                 let pos = &app.cursor_pos;
 
-                let mut bstext = format!("{:>2}", "");
-                let mut bsstyle = Style::default();
-                let us = st.get_total_upper_score();
-                let mut ustext = format!("{:>3}", us);
-                let mut usstyle = Style::default();
-
-                if let Some(score) = st.calculate_bonus() {
-                    bstext = format!("{:>2}", score);
+                let default_bstext = format!("{:>2}", "");
+                let default_bsstyle = Style::default();
+                let (bstext, bsstyle) = if let Some(score) = st.calculate_bonus() {
+                    (format!("{:>2}", score), default_bsstyle)
                 } else if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                    let score = scoring(b, d);
-                    if let Some(score) = st.calculate_bonus_if_filled_by(b, score) {
-                        bstext = format!("{:>2}", score);
-                        bsstyle = bsstyle.fg(Color::Rgb(255, 215, 0));
+                    if let Some(bs) = st.calculate_bonus_if_filled_by(b, scoring(b, d)) {
+                        (
+                            format!("{:>2}", bs),
+                            default_bsstyle.fg(Color::Rgb(255, 215, 0)),
+                        )
+                    } else {
+                        (default_bstext, default_bsstyle)
                     }
-                }
+                } else {
+                    (default_bstext, default_bsstyle)
+                };
 
-                if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                    let score = scoring(b, d);
-                    let ifus = st.get_total_upper_score_if_filled_by(b, score);
-                    if ifus > us {
-                        ustext = format!("{:>3}", ifus);
-                        usstyle = usstyle.fg(Color::Rgb(255, 215, 0));
-                    }
-                }
+                let us = st.get_total_upper_score();
+                let default_ustext = format!("{:>3}", us);
+                let default_usstyle = Style::default();
+                let (ustext, usstyle) =
+                    if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
+                        let ifus = st.get_total_upper_score_if_filled_by(b, scoring(b, d));
+                        if ifus > us {
+                            (
+                                format!("{:>3}", ifus),
+                                default_usstyle.fg(Color::Rgb(255, 215, 0)),
+                            )
+                        } else {
+                            (default_ustext, default_usstyle)
+                        }
+                    } else {
+                        (default_ustext, default_usstyle)
+                    };
 
                 Cell::from(Line::from(vec![
                     Span::styled(bstext, bsstyle),
@@ -358,17 +367,24 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let dice = dislay_dice(pid);
                 let pos = &app.cursor_pos;
                 let total_score = st.get_total_score();
-                let mut text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
-                let mut style = Style::default();
-                if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                    let score = scoring(b, d);
+                let default_text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
+                let default_style = Style::default();
+                let (text, style) =
+                    if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
+                        let score = scoring(b, d);
 
-                    let if_total_score = st.get_total_score_if_filled_by(b, score);
-                    if if_total_score > total_score {
-                        text = format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH);
-                        style = style.fg(Color::Rgb(255, 215, 0));
-                    }
-                }
+                        let if_total_score = st.get_total_score_if_filled_by(b, score);
+                        if if_total_score > total_score {
+                            (
+                                format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH),
+                                default_style.fg(Color::Rgb(255, 215, 0)),
+                            )
+                        } else {
+                            (default_text, default_style)
+                        }
+                    } else {
+                        (default_text, default_style)
+                    };
 
                 Cell::from(text).style(style)
             })),
@@ -419,7 +435,7 @@ fn draw_result_ui(f: &mut Frame, app: &App) {
         .split(f.size());
 
     draw_result(f, app, chunks[0]);
-    draw_result_score_table(f, app, chunks[1]);
+    draw_score_table(f, app, chunks[1]);
 }
 
 fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
@@ -468,93 +484,6 @@ fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
         })
         .alignment(Alignment::Center);
     f.render_widget(text, text_chunk[0]);
-}
-
-fn draw_result_score_table(f: &mut Frame, app: &App, chunk: Rect) {
-    match app.state {
-        AppState::Result => (),
-        _ => panic!(),
-    }
-
-    let mut score_rows = enum_iterator::all::<Boxes>()
-        .map(|b| {
-            Row::new(
-                vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
-                    .into_iter()
-                    .chain(
-                        (0..app.get_game_data().get_num_players())
-                            .map(|pid| {
-                                let st = app.get_game_data().get_score_table(pid);
-                                let score = st.get_score(b).unwrap();
-                                let text = format!("{:>1$}", score, SCORE_CELL_WIDTH);
-
-                                Cell::from(text).style(Style::default())
-                            })
-                            .collect::<Vec<_>>(),
-                    ),
-            )
-        })
-        .collect::<Vec<_>>();
-    let bonus_cell = Row::new(
-        vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
-            .into_iter()
-            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
-                let st = &app.get_game_data().get_score_table(pid);
-                let bstext = format!("{:>2}", st.calculate_bonus().unwrap());
-                let ustext = format!("{:>3}", st.get_total_upper_score());
-
-                Cell::from(Line::from(vec![
-                    Span::styled(bstext, Style::default()),
-                    Span::raw(" ("),
-                    Span::styled(ustext, Style::default()),
-                    Span::raw(format!("/{:>2})", ScoreTable::BONUS_THRESHOLD)),
-                ]))
-            })),
-    );
-    score_rows.push(bonus_cell);
-    let total_cell = Row::new(
-        vec![Cell::from(format!("{:>1$}", "Total", BOXES_CELL_WIDTH))]
-            .into_iter()
-            .chain((0..app.get_game_data().get_num_players()).map(|pid| {
-                let st = &app.get_game_data().get_score_table(pid);
-                let total_score = st.get_total_score();
-                let text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
-
-                Cell::from(text).style(Style::default())
-            })),
-    );
-    score_rows.push(total_cell);
-    let score_header = Row::new(
-        vec![Cell::from(String::from(""))].into_iter().chain(
-            (0..app.get_game_data().get_num_players())
-                .map(|pid| {
-                    let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
-
-                    Cell::from(text).style(Style::default())
-                })
-                .collect::<Vec<_>>(),
-        ),
-    );
-    let score_table_width = (0..(app.get_game_data().get_num_players() + 1))
-        .map(|x| {
-            Constraint::Length(if x == 0 {
-                BOXES_CELL_WIDTH as u16
-            } else {
-                SCORE_CELL_WIDTH as u16
-            })
-        })
-        .collect::<Vec<_>>();
-    let score_block = Table::new(score_rows, &score_table_width)
-        .style(
-            Style::default()
-                .fg(Color::White)
-                .remove_modifier(Modifier::BOLD),
-        )
-        .header(score_header)
-        .block(Block::default().title("SCORE").borders(Borders::ALL))
-        .column_spacing(1);
-
-    f.render_widget(score_block, chunk);
 }
 
 fn create_centerd_rect(base_rect: Rect, width: u16, height: u16) -> Rect {
