@@ -151,20 +151,14 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     .split(create_centerd_rect(chunk, rect_width, rect_height));
 
                 let text = match (&play.game_phase, play.is_held[i]) {
-                    (GamePhase::Roll(..), ..) | (.., true) => vec![
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][0],
-                            Style::default(),
-                        )),
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][1],
-                            Style::default(),
-                        )),
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][2],
-                            Style::default(),
-                        )),
-                    ],
+                    (GamePhase::Roll(..), ..) | (.., true) => (0..DICE_STR_HEIGHT)
+                        .map(|h| {
+                            Line::from(Span::styled(
+                                DICE_STR[(d - 1) as usize][h],
+                                Style::default(),
+                            ))
+                        })
+                        .collect(),
                     _ => vec![],
                 };
                 let text = Paragraph::new(text)
@@ -224,20 +218,14 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
             for (i, &d) in play.hand.get_dice().iter().enumerate() {
                 let text = match (&play.game_phase, play.is_held[i]) {
                     (GamePhase::Roll(..), ..) | (.., true) => vec![],
-                    _ => vec![
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][0],
-                            Style::default(),
-                        )),
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][1],
-                            Style::default(),
-                        )),
-                        Line::from(Span::styled(
-                            DICE_STR[(d - 1) as usize][2],
-                            Style::default(),
-                        )),
-                    ],
+                    _ => (0..DICE_STR_HEIGHT)
+                        .map(|h| {
+                            Line::from(Span::styled(
+                                DICE_STR[(d - 1) as usize][h],
+                                Style::default(),
+                            ))
+                        })
+                        .collect(),
                 };
                 let text = Paragraph::new(text)
                     .block(match (&play.game_phase, play.is_held[i]) {
