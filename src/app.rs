@@ -5,6 +5,7 @@ use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
 use array_macro::array;
 use enum_iterator::{all, first, last, Sequence};
+use std::fmt;
 use thiserror::Error;
 
 #[derive(PartialEq, Eq)]
@@ -69,12 +70,55 @@ impl Play {
     }
 }
 
+#[derive(PartialEq, Eq)]
+pub enum StartMenuSelection {
+    Play,
+    Exit,
+}
+
+impl fmt::Display for StartMenuSelection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StartMenuSelection::Play => f.pad("Play"),
+            StartMenuSelection::Exit => f.pad("Exit"),
+        }
+    }
+}
+
+pub const LOWEST_PLAYER_ID: usize = 1;
+pub const HIGHEST_PLAYER_ID: usize = 4;
+
+#[derive(PartialEq, Eq)]
+pub enum NumPlayersSelection {
+    NumPlayers(usize),
+    Back,
+}
+
+impl fmt::Display for NumPlayersSelection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NumPlayersSelection::NumPlayers(n) => f.pad(&format!("{} Players", n)),
+            NumPlayersSelection::Back => f.pad("Back"),
+        }
+    }
+}
+
 pub enum AppState {
+    StartMenu(StartMenuSelection),
+    SelectNumPlayers(NumPlayersSelection),
     Play(Option<Play>, PlayCursorPos),
     Result,
 }
 
 impl AppState {
+    fn initialized_start_menu_state() -> Self {
+        AppState::StartMenu(StartMenuSelection::Play)
+    }
+
+    fn initialized_select_num_players_state() -> Self {
+        AppState::SelectNumPlayers(NumPlayersSelection::NumPlayers(LOWEST_PLAYER_ID))
+    }
+
     fn initialized_play_state() -> Self {
         AppState::Play(None, PlayCursorPos::Disappear)
     }
@@ -146,13 +190,19 @@ pub struct App {
     game_data: Option<GameData>,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     const MAX_ROLL_COUNT: usize = 3;
 
-    pub fn new(num_players: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            state: AppState::initialized_play_state(),
-            game_data: Some(GameData::new(num_players)),
+            state: AppState::StartMenu(StartMenuSelection::Play),
+            game_data: None,
         }
     }
 
@@ -223,8 +273,124 @@ impl App {
     /* action handlers */
     pub fn do_action(&mut self, input_event: InputEvent) -> AppReturn {
         match self.state {
+            AppState::StartMenu(..) => self.do_action_in_start_menu(input_event),
+            AppState::SelectNumPlayers(..) => self.do_action_in_select_num_players(input_event),
             AppState::Play(..) => self.do_action_in_play(input_event),
             AppState::Result => self.do_action_in_result(input_event),
+        }
+    }
+
+    fn do_action_in_start_menu(&mut self, input_event: InputEvent) -> AppReturn {
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            Actions::Select => {
+                let AppState::StartMenu(pos) = &self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        self.state = AppState::initialized_select_num_players_state();
+                        AppReturn::Continue
+                    }
+                    StartMenuSelection::Exit => AppReturn::Exit,
+                }
+            }
+
+            Actions::Up => {
+                let AppState::StartMenu(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        *pos = StartMenuSelection::Exit;
+                    }
+                    StartMenuSelection::Exit => {
+                        *pos = StartMenuSelection::Play;
+                    }
+                }
+                AppReturn::Continue
+            }
+
+            Actions::Down => {
+                let AppState::StartMenu(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        *pos = StartMenuSelection::Exit;
+                    }
+                    StartMenuSelection::Exit => {
+                        *pos = StartMenuSelection::Play;
+                    }
+                }
+                AppReturn::Continue
+            }
+
+            _ => AppReturn::Continue,
+        }
+    }
+
+    fn do_action_in_select_num_players(&mut self, input_event: InputEvent) -> AppReturn {
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            Actions::Select => {
+                let AppState::SelectNumPlayers(pos) = &self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    &NumPlayersSelection::NumPlayers(num_players) => {
+                        self.state = AppState::initialized_play_state();
+                        self.game_data = Some(GameData::new(num_players));
+                    }
+                    NumPlayersSelection::Back => {
+                        self.state = AppState::initialized_start_menu_state();
+                    }
+                }
+                AppReturn::Continue
+            }
+
+            Actions::Up => {
+                let AppState::SelectNumPlayers(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                *pos = match pos {
+                    &mut NumPlayersSelection::NumPlayers(num_players) => {
+                        if num_players == LOWEST_PLAYER_ID {
+                            NumPlayersSelection::Back
+                        } else if LOWEST_PLAYER_ID < num_players && num_players <= HIGHEST_PLAYER_ID
+                        {
+                            NumPlayersSelection::NumPlayers(num_players - 1)
+                        } else {
+                            panic!("Unexpected NumPlayers value");
+                        }
+                    }
+                    NumPlayersSelection::Back => NumPlayersSelection::NumPlayers(HIGHEST_PLAYER_ID),
+                };
+                AppReturn::Continue
+            }
+
+            Actions::Down => {
+                let AppState::SelectNumPlayers(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                *pos = match pos {
+                    &mut NumPlayersSelection::NumPlayers(num_players) => {
+                        if (LOWEST_PLAYER_ID..HIGHEST_PLAYER_ID).contains(&num_players) {
+                            NumPlayersSelection::NumPlayers(num_players + 1)
+                        } else if num_players == HIGHEST_PLAYER_ID {
+                            NumPlayersSelection::Back
+                        } else {
+                            panic!("Unexpected NumPlayers value");
+                        }
+                    }
+                    NumPlayersSelection::Back => NumPlayersSelection::NumPlayers(LOWEST_PLAYER_ID),
+                };
+                AppReturn::Continue
+            }
+
+            _ => AppReturn::Continue,
         }
     }
 

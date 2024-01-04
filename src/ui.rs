@@ -1,11 +1,15 @@
-use crate::app::{App, AppState, AppStateError, GamePhase, PlayCursorPos};
+use crate::app::{
+    App, AppState, AppStateError, GamePhase, NumPlayersSelection, PlayCursorPos,
+    StartMenuSelection, HIGHEST_PLAYER_ID, LOWEST_PLAYER_ID,
+};
+use crate::assets;
 use crate::hand::Hand;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
     Frame,
 };
@@ -69,14 +73,133 @@ const DICE_STR_WIDTH: usize = {
 const BOXES_CELL_WIDTH: usize = 20;
 const SCORE_CELL_WIDTH: usize = 11;
 
+const FRAME_MARGIN: u16 = 1;
+
+const SELECTION_MARGIN: u16 = 1;
+
 const DICE_MARGIN: u16 = 1;
 const HAND_MARGIN: u16 = 1;
 const DUST_MARGIN: u16 = 1;
 
 pub fn draw_ui(f: &mut Frame, app: &App) {
     match app.state {
+        AppState::StartMenu(..) => draw_start_menu(f, app),
+        AppState::SelectNumPlayers(..) => draw_select_number_of_players(f, app),
         AppState::Play(..) => draw_play_ui(f, app),
         AppState::Result => draw_result_ui(f, app),
+    }
+}
+
+fn draw_start_menu(f: &mut Frame, app: &App) {
+    let chunk = drwa_logo_and_frame(f);
+    draw_start_menu_selections(f, app, chunk);
+}
+
+fn draw_select_number_of_players(f: &mut Frame, app: &App) {
+    let chunk = drwa_logo_and_frame(f);
+    draw_selections_for_number_of_players(f, app, chunk);
+}
+
+fn drwa_logo_and_frame(f: &mut Frame) -> Rect {
+    /* Draw frame border */
+    let chunk = Layout::default()
+        .constraints([Constraint::Percentage(100)])
+        .split(f.size());
+    let block = Block::default().borders(Borders::ALL);
+    f.render_widget(block, chunk[0]);
+
+    /* Distribute the screen */
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .margin(FRAME_MARGIN)
+        .split(chunk[0]);
+
+    draw_logo(f, chunks[0]);
+
+    chunks[1]
+}
+
+fn draw_logo(f: &mut Frame, chunk: Rect) {
+    let logo_chunk = Layout::default()
+        .constraints([Constraint::Percentage(100)])
+        .split(create_centerd_rect(
+            chunk,
+            chunk.width,
+            assets::MENU_LOGO_HEIGHT as u16,
+        ));
+    let lines = assets::MENU_LOGO_STR
+        .iter()
+        .map(|&s| Line::from(Span::styled(s, Style::default())))
+        .collect::<Vec<_>>();
+    let text = Paragraph::new(lines).alignment(Alignment::Center);
+    f.render_widget(text, logo_chunk[0]);
+}
+
+fn draw_start_menu_selections(f: &mut Frame, app: &App, chunk: Rect) {
+    let AppState::StartMenu(pos) = &app.state else {
+        panic!("Unexpected state")
+    };
+    let choices = [StartMenuSelection::Play, StartMenuSelection::Exit];
+    let choices = choices
+        .iter()
+        .map(|c| {
+            Line::from(Span::styled(
+                format!("{}", c),
+                if pos == c {
+                    Style::default().fg(Color::DarkGray).bg(Color::White)
+                } else {
+                    Style::default()
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    draw_selections(f, chunk, choices);
+}
+
+fn draw_selections_for_number_of_players(f: &mut Frame, app: &App, chunk: Rect) {
+    let AppState::SelectNumPlayers(pos) = &app.state else {
+        panic!("Unexpected state")
+    };
+    let choices = (LOWEST_PLAYER_ID..=HIGHEST_PLAYER_ID)
+        .map(NumPlayersSelection::NumPlayers)
+        .chain([NumPlayersSelection::Back])
+        .collect::<Vec<_>>();
+    let choices = choices
+        .iter()
+        .map(|c| {
+            Line::from(Span::styled(
+                format!("{}", c),
+                if pos == c {
+                    Style::default().fg(Color::DarkGray).bg(Color::White)
+                } else {
+                    Style::default()
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    draw_selections(f, chunk, choices);
+}
+
+fn draw_selections<'a, I>(f: &mut Frame, chunk: Rect, choices: I)
+where
+    I: IntoIterator,
+    I::Item: Into<Text<'a>>,
+{
+    let choices = choices.into_iter().map(|c| c.into()).collect::<Vec<_>>();
+    let choice_height = 1;
+    let max_choice_str_len = choices.iter().map(|c| c.width()).max().unwrap() as u16;
+    let rect_width = max_choice_str_len + SELECTION_MARGIN * 2;
+    let choice_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints((0..(2 * choices.len() - 1)).map(|_| Constraint::Length(choice_height)))
+        .split(create_centerd_rect(chunk, rect_width, chunk.height));
+
+    for (choice, &chunk) in choices.into_iter().zip(choice_chunks.iter().step_by(2)) {
+        let text = Paragraph::new(choice)
+            .block(Block::default())
+            .alignment(Alignment::Center);
+        f.render_widget(text, chunk);
     }
 }
 

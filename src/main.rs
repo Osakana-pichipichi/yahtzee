@@ -1,4 +1,5 @@
 mod app;
+mod assets;
 mod events;
 mod hand;
 mod score_table;
@@ -15,7 +16,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{cell::RefCell, env, io, rc::Rc, time::Duration};
+use std::{cell::RefCell, io, rc::Rc, time::Duration};
 
 pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
     enable_raw_mode()?;
@@ -52,24 +53,7 @@ pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let num_players = if args.len() > 1 {
-        match args[1].parse::<usize>() {
-            Ok(0) => {
-                return Err(anyhow::anyhow!(
-                    "The number of players must be greater than or equal to 1."
-                ));
-            }
-            Ok(x) => x,
-            Err(..) => {
-                return Err(anyhow::anyhow!("Invalid input."));
-            }
-        }
-    } else {
-        2
-    };
-
-    let app = Rc::new(RefCell::new(App::new(num_players)));
+    let app = Rc::new(RefCell::new(App::new()));
     start_ui(app)?;
     Ok(())
 }
