@@ -23,6 +23,7 @@ pub enum PlayCursorPos {
 }
 
 pub enum GamePhase {
+    Init,
     Roll(usize),
     SelectOrReroll(usize),
     Select,
@@ -39,10 +40,15 @@ impl Play {
     pub fn new(player_id: usize) -> Self {
         Self {
             player_id,
-            hand: Hand::new_with_random_n_dice(Hand::DICE_NUM),
+            hand: Hand::new_with_random_n_dice(0),
             is_held: [false; 5],
-            game_phase: GamePhase::Roll(0),
+            game_phase: GamePhase::Init,
         }
+    }
+
+    pub fn start_first_roll(&mut self) {
+        self.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
+        self.game_phase = GamePhase::Roll(0);
     }
 
     pub fn reroll_dice(&mut self) -> usize {
@@ -225,14 +231,28 @@ impl App {
     fn do_action_in_play(&mut self, input_event: InputEvent) -> AppReturn {
         match self.get_play_data() {
             Ok(play) => match play.game_phase {
+                GamePhase::Init => self.do_action_in_init(input_event),
                 GamePhase::Roll(..) => self.do_action_in_roll(input_event),
                 GamePhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
                 GamePhase::Select => self.do_action_in_select(input_event),
             },
             Err(e) => match e.downcast_ref::<AppStateError>().unwrap() {
-                AppStateError::NoPlayData => self.do_action_in_init(input_event),
+                AppStateError::NoPlayData => self.do_action_in_no_play_data(input_event),
                 _ => panic!("{}", e),
             },
+        }
+    }
+
+    fn do_action_in_no_play_data(&mut self, input_event: InputEvent) -> AppReturn {
+        match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            _ => {
+                let pid = self.get_game_data().current_player_id();
+                self.initialize_play_data(pid).unwrap();
+                self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
+                AppReturn::Continue
+            }
         }
     }
 
@@ -241,9 +261,8 @@ impl App {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                let pid = self.get_game_data().current_player_id();
-                self.initialize_play_data(pid).unwrap();
-                self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
+                let play = self.get_mut_play_data().unwrap();
+                play.start_first_roll();
                 AppReturn::Continue
             }
 
