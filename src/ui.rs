@@ -1,4 +1,4 @@
-use crate::app::{App, AppState, AppStateError, CursorPos, GamePhase};
+use crate::app::{App, AppState, AppStateError, GamePhase, PlayCursorPos};
 use crate::hand::Hand;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
@@ -116,8 +116,8 @@ fn draw_role_block(f: &mut Frame, app: &App, chunk: Rect) {
         .split(create_centerd_rect(chunk, 13, 3));
     let text = Paragraph::new(Line::from(Span::styled("Role!", Style::default())))
         .block(Block::default().borders(Borders::ALL))
-        .style(match app.cursor_pos {
-            CursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
+        .style(match app.get_play_cursor_pos().unwrap() {
+            PlayCursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
             _ => Style::default(),
         })
         .alignment(Alignment::Center);
@@ -168,8 +168,8 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                         }
                         _ => Block::default(),
                     })
-                    .style(match app.cursor_pos {
-                        CursorPos::Hand(pos) => {
+                    .style(match app.get_play_cursor_pos().unwrap() {
+                        &PlayCursorPos::Hand(pos) => {
                             if i == pos {
                                 Style::default().fg(Color::DarkGray).bg(Color::White)
                             } else {
@@ -232,8 +232,8 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                         (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
                         _ => Block::default().borders(Borders::ALL),
                     })
-                    .style(match app.cursor_pos {
-                        CursorPos::Dust(pos) => {
+                    .style(match app.get_play_cursor_pos().unwrap() {
+                        &PlayCursorPos::Dust(pos) => {
                             if i == pos {
                                 Style::default().fg(Color::DarkGray).bg(Color::White)
                             } else {
@@ -289,8 +289,9 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                                 };
 
                                 let style = if is_playing && !st.has_score_in(b) {
+                                    let pos = app.get_play_cursor_pos().unwrap();
                                     let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
-                                    if app.cursor_pos == CursorPos::Table(b) {
+                                    if pos == &PlayCursorPos::Table(b) {
                                         style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
                                     }
                                     style
@@ -312,14 +313,20 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let st = &app.get_game_data().get_score_table(pid);
                 let is_playing = is_playing(pid);
                 let dice = dislay_dice(pid);
-                let pos = &app.cursor_pos;
 
                 let default_bstext = format!("{:>2}", "");
                 let default_bsstyle = Style::default();
                 let (bstext, bsstyle) = if let Some(score) = st.calculate_bonus() {
                     (format!("{:>2}", score), default_bsstyle)
-                } else if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                    if let Some(bs) = st.calculate_bonus_if_filled_by(b, scoring(b, d)) {
+                } else if let (true, Some(d)) = (is_playing, &dice) {
+                    let pos = app.get_play_cursor_pos().unwrap();
+                    let ifbs = if let &PlayCursorPos::Table(b) = pos {
+                        st.calculate_bonus_if_filled_by(b, scoring(b, d))
+                    } else {
+                        None
+                    };
+
+                    if let Some(bs) = ifbs {
                         (
                             format!("{:>2}", bs),
                             default_bsstyle.fg(Color::Rgb(255, 215, 0)),
@@ -334,20 +341,25 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let us = st.get_total_upper_score();
                 let default_ustext = format!("{:>3}", us);
                 let default_usstyle = Style::default();
-                let (ustext, usstyle) =
-                    if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                        let ifus = st.get_total_upper_score_if_filled_by(b, scoring(b, d));
-                        if ifus > us {
-                            (
-                                format!("{:>3}", ifus),
-                                default_usstyle.fg(Color::Rgb(255, 215, 0)),
-                            )
-                        } else {
-                            (default_ustext, default_usstyle)
-                        }
+                let (ustext, usstyle) = if let (true, Some(d)) = (is_playing, &dice) {
+                    let pos = app.get_play_cursor_pos().unwrap();
+                    let ifus = if let &PlayCursorPos::Table(b) = pos {
+                        st.get_total_upper_score_if_filled_by(b, scoring(b, d))
+                    } else {
+                        us
+                    };
+
+                    if ifus > us {
+                        (
+                            format!("{:>3}", ifus),
+                            default_usstyle.fg(Color::Rgb(255, 215, 0)),
+                        )
                     } else {
                         (default_ustext, default_usstyle)
-                    };
+                    }
+                } else {
+                    (default_ustext, default_usstyle)
+                };
 
                 Cell::from(Line::from(vec![
                     Span::styled(bstext, bsstyle),
@@ -365,26 +377,29 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let st = &app.get_game_data().get_score_table(pid);
                 let is_playing = is_playing(pid);
                 let dice = dislay_dice(pid);
-                let pos = &app.cursor_pos;
                 let total_score = st.get_total_score();
+
                 let default_text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let default_style = Style::default();
-                let (text, style) =
-                    if let (&CursorPos::Table(b), true, Some(d)) = (pos, is_playing, dice) {
-                        let score = scoring(b, d);
+                let (text, style) = if let (true, Some(d)) = (is_playing, dice) {
+                    let pos = app.get_play_cursor_pos().unwrap();
+                    let if_total_score = if let &PlayCursorPos::Table(b) = pos {
+                        st.get_total_score_if_filled_by(b, scoring(b, d))
+                    } else {
+                        total_score
+                    };
 
-                        let if_total_score = st.get_total_score_if_filled_by(b, score);
-                        if if_total_score > total_score {
-                            (
-                                format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH),
-                                default_style.fg(Color::Rgb(255, 215, 0)),
-                            )
-                        } else {
-                            (default_text, default_style)
-                        }
+                    if if_total_score > total_score {
+                        (
+                            format!("{:>1$}", if_total_score, SCORE_CELL_WIDTH),
+                            default_style.fg(Color::Rgb(255, 215, 0)),
+                        )
                     } else {
                         (default_text, default_style)
-                    };
+                    }
+                } else {
+                    (default_text, default_style)
+                };
 
                 Cell::from(text).style(style)
             })),
@@ -478,10 +493,6 @@ fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
     ]);
     let text = Paragraph::new(results)
         .block(Block::default().borders(Borders::ALL))
-        .style(match app.cursor_pos {
-            CursorPos::Role => Style::default().fg(Color::DarkGray).bg(Color::White),
-            _ => Style::default(),
-        })
         .alignment(Alignment::Center);
     f.render_widget(text, text_chunk[0]);
 }

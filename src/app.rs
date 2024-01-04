@@ -14,7 +14,7 @@ pub enum AppReturn {
 }
 
 #[derive(PartialEq, Eq)]
-pub enum CursorPos {
+pub enum PlayCursorPos {
     Role,
     Hand(usize),
     Dust(usize),
@@ -64,8 +64,14 @@ impl Play {
 }
 
 pub enum AppState {
-    Play(Option<Play>),
+    Play(Option<Play>, PlayCursorPos),
     Result,
+}
+
+impl AppState {
+    fn initialized_play_state() -> Self {
+        AppState::Play(None, PlayCursorPos::Disappear)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -131,7 +137,6 @@ impl GameData {
 
 pub struct App {
     pub state: AppState,
-    pub cursor_pos: CursorPos,
     game_data: Option<GameData>,
 }
 
@@ -140,8 +145,7 @@ impl App {
 
     pub fn new(num_players: usize) -> Self {
         Self {
-            state: AppState::Play(None),
-            cursor_pos: CursorPos::Role,
+            state: AppState::initialized_play_state(),
             game_data: Some(GameData::new(num_players)),
         }
     }
@@ -157,23 +161,23 @@ impl App {
 
     pub fn get_play_data(&self) -> Result<&Play> {
         match &self.state {
-            AppState::Play(p) => p.as_ref().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
+            AppState::Play(p, ..) => p.as_ref().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
             _ => Err(anyhow!(AppStateError::UnexpectedState)),
         }
     }
 
     fn get_mut_play_data(&mut self) -> Result<&mut Play> {
         match &mut self.state {
-            AppState::Play(p) => p.as_mut().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
+            AppState::Play(p, ..) => p.as_mut().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
             _ => Err(anyhow!(AppStateError::UnexpectedState)),
         }
     }
 
     fn initialize_play_data(&mut self, player_id: usize) -> Result<&Play> {
         match &self.state {
-            AppState::Play(p) => {
+            AppState::Play(p, ..) => {
                 if p.is_none() {
-                    self.state = AppState::Play(Some(Play::new(player_id)));
+                    self.state = AppState::Play(Some(Play::new(player_id)), PlayCursorPos::Role);
                     self.get_play_data()
                 } else {
                     Err(anyhow!(AppStateError::ExistPlayData))
@@ -186,7 +190,24 @@ impl App {
     fn cleanup_play_data(&mut self) -> Result<()> {
         match &self.state {
             AppState::Play(..) => {
-                self.state = AppState::Play(None);
+                self.state = AppState::initialized_play_state();
+                Ok(())
+            }
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    pub fn get_play_cursor_pos(&self) -> Result<&PlayCursorPos> {
+        match &self.state {
+            AppState::Play(.., pos) => Ok(pos),
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    fn set_play_cursor_pos(&mut self, new_pos: PlayCursorPos) -> Result<()> {
+        match &mut self.state {
+            AppState::Play(_, pos) => {
+                *pos = new_pos;
                 Ok(())
             }
             _ => Err(anyhow!(AppStateError::UnexpectedState)),
@@ -222,6 +243,7 @@ impl App {
             Actions::Select => {
                 let pid = self.get_game_data().current_player_id();
                 self.initialize_play_data(pid).unwrap();
+                self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
                 AppReturn::Continue
             }
 
@@ -233,7 +255,7 @@ impl App {
         let pid = self.get_mut_play_data().unwrap().player_id;
         for pos in all::<Boxes>() {
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
-                self.cursor_pos = CursorPos::Table(pos);
+                self.set_play_cursor_pos(PlayCursorPos::Table(pos)).unwrap();
                 break;
             }
         }
@@ -254,7 +276,7 @@ impl App {
                 play.is_held = [true; Hand::DICE_NUM];
                 if count < App::MAX_ROLL_COUNT {
                     play.game_phase = GamePhase::SelectOrReroll(count);
-                    self.cursor_pos = CursorPos::Hand(0);
+                    self.set_play_cursor_pos(PlayCursorPos::Hand(0)).unwrap();
                 } else {
                     play.game_phase = GamePhase::Select;
                     self.move_cursor_pos_to_table();
@@ -271,14 +293,15 @@ impl App {
     }
 
     fn up_action_in_score_table(&mut self) {
-        if let CursorPos::Table(init_pos) = self.cursor_pos {
+        if let &PlayCursorPos::Table(init_pos) = self.get_play_cursor_pos().unwrap() {
             let mut pos = init_pos;
             loop {
                 let prev = pos.previous().unwrap_or_else(|| last::<Boxes>().unwrap());
                 let pid = self.get_play_data().unwrap().player_id;
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(prev);
                 if !has_score || prev == init_pos {
-                    self.cursor_pos = CursorPos::Table(prev);
+                    self.set_play_cursor_pos(PlayCursorPos::Table(prev))
+                        .unwrap();
                     break;
                 }
                 pos = prev;
@@ -289,14 +312,15 @@ impl App {
     }
 
     fn down_action_in_score_table(&mut self) {
-        if let CursorPos::Table(init_pos) = self.cursor_pos {
+        if let &PlayCursorPos::Table(init_pos) = self.get_play_cursor_pos().unwrap() {
             let mut pos = init_pos;
             loop {
                 let next = pos.next().unwrap_or_else(|| first::<Boxes>().unwrap());
                 let pid = self.get_play_data().unwrap().player_id;
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(next);
                 if !has_score || next == init_pos {
-                    self.cursor_pos = CursorPos::Table(next);
+                    self.set_play_cursor_pos(PlayCursorPos::Table(next))
+                        .unwrap();
                     break;
                 }
                 pos = next;
@@ -307,7 +331,7 @@ impl App {
     }
 
     fn confirm_score_action(&mut self) {
-        if let CursorPos::Table(pos) = self.cursor_pos {
+        if let &PlayCursorPos::Table(pos) = self.get_play_cursor_pos().unwrap() {
             let play = self.get_play_data().unwrap();
             let pid = play.player_id;
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
@@ -319,10 +343,9 @@ impl App {
 
                 let next_score_table = self.get_game_data().get_score_table(next_pid);
                 if !next_score_table.has_all_scores() {
-                    self.cursor_pos = CursorPos::Role;
+                    self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
                 } else {
                     self.state = AppState::Result;
-                    self.cursor_pos = CursorPos::Disappear;
                 }
             }
         } else {
@@ -335,8 +358,8 @@ impl App {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
+                match self.get_play_cursor_pos().unwrap() {
+                    PlayCursorPos::Role => {
                         let play = self.get_mut_play_data().unwrap();
                         if !play.is_held.iter().all(|&x| x) {
                             play.reroll_dice();
@@ -348,11 +371,11 @@ impl App {
                                 };
                         }
                     }
-                    CursorPos::Hand(pos) | CursorPos::Dust(pos) => {
+                    &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
                         let play = self.get_mut_play_data().unwrap();
                         play.is_held[pos] = !play.is_held[pos]
                     }
-                    CursorPos::Table(..) => {
+                    PlayCursorPos::Table(..) => {
                         self.confirm_score_action();
                     }
                     _ => (),
@@ -361,19 +384,22 @@ impl App {
             }
 
             Actions::Left => {
-                match self.cursor_pos {
-                    CursorPos::Hand(pos) => {
+                match self.get_play_cursor_pos().unwrap() {
+                    &PlayCursorPos::Hand(pos) => {
                         if pos > 0 {
-                            self.cursor_pos = CursorPos::Hand(pos - 1);
+                            self.set_play_cursor_pos(PlayCursorPos::Hand(pos - 1))
+                                .unwrap();
                         }
                     }
-                    CursorPos::Dust(pos) => {
+                    &PlayCursorPos::Dust(pos) => {
                         if pos > 0 {
-                            self.cursor_pos = CursorPos::Dust(pos - 1);
+                            self.set_play_cursor_pos(PlayCursorPos::Dust(pos - 1))
+                                .unwrap();
                         }
                     }
-                    CursorPos::Table(..) => {
-                        self.cursor_pos = CursorPos::Hand(Hand::DICE_NUM - 1);
+                    PlayCursorPos::Table(..) => {
+                        self.set_play_cursor_pos(PlayCursorPos::Hand(Hand::DICE_NUM - 1))
+                            .unwrap();
                     }
                     _ => (),
                 }
@@ -381,22 +407,24 @@ impl App {
             }
 
             Actions::Right => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
+                match self.get_play_cursor_pos().unwrap() {
+                    PlayCursorPos::Role => {
                         self.move_cursor_pos_to_table();
                     }
-                    CursorPos::Hand(pos) => {
+                    PlayCursorPos::Hand(pos) => {
                         let new_pos = pos + 1;
                         if new_pos < Hand::DICE_NUM {
-                            self.cursor_pos = CursorPos::Hand(new_pos);
+                            self.set_play_cursor_pos(PlayCursorPos::Hand(new_pos))
+                                .unwrap();
                         } else {
                             self.move_cursor_pos_to_table();
                         }
                     }
-                    CursorPos::Dust(pos) => {
+                    PlayCursorPos::Dust(pos) => {
                         let new_pos = pos + 1;
                         if new_pos < Hand::DICE_NUM {
-                            self.cursor_pos = CursorPos::Dust(new_pos);
+                            self.set_play_cursor_pos(PlayCursorPos::Dust(new_pos))
+                                .unwrap();
                         } else {
                             self.move_cursor_pos_to_table();
                         }
@@ -407,17 +435,17 @@ impl App {
             }
 
             Actions::Up => {
-                match self.cursor_pos {
-                    CursorPos::Hand(..) => {
+                match self.get_play_cursor_pos().unwrap() {
+                    PlayCursorPos::Hand(..) => {
                         let play = self.get_play_data().unwrap();
                         if !play.is_held.iter().all(|&x| x) {
-                            self.cursor_pos = CursorPos::Role;
+                            self.set_play_cursor_pos(PlayCursorPos::Role).unwrap();
                         }
                     }
-                    CursorPos::Dust(pos) => {
-                        self.cursor_pos = CursorPos::Hand(pos);
+                    &PlayCursorPos::Dust(pos) => {
+                        self.set_play_cursor_pos(PlayCursorPos::Hand(pos)).unwrap();
                     }
-                    CursorPos::Table(..) => {
+                    PlayCursorPos::Table(..) => {
                         self.up_action_in_score_table();
                     }
                     _ => (),
@@ -426,14 +454,14 @@ impl App {
             }
 
             Actions::Down => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
-                        self.cursor_pos = CursorPos::Hand(0);
+                match self.get_play_cursor_pos().unwrap() {
+                    PlayCursorPos::Role => {
+                        self.set_play_cursor_pos(PlayCursorPos::Hand(0)).unwrap();
                     }
-                    CursorPos::Hand(pos) => {
-                        self.cursor_pos = CursorPos::Dust(pos);
+                    &PlayCursorPos::Hand(pos) => {
+                        self.set_play_cursor_pos(PlayCursorPos::Dust(pos)).unwrap();
                     }
-                    CursorPos::Table(..) => {
+                    PlayCursorPos::Table(..) => {
                         self.down_action_in_score_table();
                     }
                     _ => (),
