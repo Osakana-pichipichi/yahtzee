@@ -267,16 +267,14 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
 }
 
 fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
-    let play = app.get_play_data();
-
     let is_playing = |pid: usize| -> bool {
-        match play {
+        match app.get_play_data() {
             Ok(play) => pid == play.player_id,
             _ => false,
         }
     };
     let dislay_dice = |pid: usize| -> Option<&[u32]> {
-        match play {
+        match app.get_play_data() {
             Ok(p) if is_playing(pid) => Some(p.hand.get_dice()),
             _ => None,
         }
