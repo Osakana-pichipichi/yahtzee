@@ -53,11 +53,7 @@ impl Play {
     }
 
     pub fn reroll_dice(&mut self) -> usize {
-        let removes = self
-            .is_held
-            .iter()
-            .map(|&is_heled| !is_heled)
-            .collect::<Vec<_>>();
+        let removes: Vec<_> = self.is_held.iter().map(|&is_heled| !is_heled).collect();
         self.hand.remove_dice(&removes);
 
         let reroll_dices = removes.iter().filter(|&&e| e).count();
@@ -174,11 +170,11 @@ impl GameData {
     }
 
     pub fn current_player_id(&self) -> usize {
-        let pid_to_filled_scores = self
+        let pid_to_filled_scores: Vec<_> = self
             .scores
             .iter()
             .map(|e| e.get_num_filled_scores())
-            .collect::<Vec<_>>();
+            .collect();
         (1..self.get_num_players())
             .find(|&i| pid_to_filled_scores[i - 1] > pid_to_filled_scores[i])
             .unwrap_or(0)

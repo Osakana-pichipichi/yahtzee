@@ -128,10 +128,10 @@ fn draw_logo(f: &mut Frame, chunk: Rect) {
             chunk.width,
             assets::MENU_LOGO_HEIGHT as u16,
         ));
-    let lines = assets::MENU_LOGO_STR
+    let lines: Vec<_> = assets::MENU_LOGO_STR
         .iter()
         .map(|&s| Line::from(Span::styled(s, Style::default())))
-        .collect::<Vec<_>>();
+        .collect();
     let text = Paragraph::new(lines).alignment(Alignment::Center);
     f.render_widget(text, logo_chunk[0]);
 }
@@ -141,7 +141,7 @@ fn draw_start_menu_selections(f: &mut Frame, app: &App, chunk: Rect) {
         panic!("Unexpected state")
     };
     let choices = [StartMenuSelection::Play, StartMenuSelection::Exit];
-    let choices = choices
+    let choices: Vec<_> = choices
         .iter()
         .map(|c| {
             Line::from(Span::styled(
@@ -153,7 +153,7 @@ fn draw_start_menu_selections(f: &mut Frame, app: &App, chunk: Rect) {
                 },
             ))
         })
-        .collect::<Vec<_>>();
+        .collect();
     draw_selections(f, chunk, choices);
 }
 
@@ -161,11 +161,11 @@ fn draw_selections_for_number_of_players(f: &mut Frame, app: &App, chunk: Rect) 
     let AppState::SelectNumPlayers(pos) = &app.state else {
         panic!("Unexpected state")
     };
-    let choices = (LOWEST_PLAYER_ID..=HIGHEST_PLAYER_ID)
+    let choices: Vec<_> = (LOWEST_PLAYER_ID..=HIGHEST_PLAYER_ID)
         .map(NumPlayersSelection::NumPlayers)
         .chain([NumPlayersSelection::Back])
-        .collect::<Vec<_>>();
-    let choices = choices
+        .collect();
+    let choices: Vec<_> = choices
         .iter()
         .map(|c| {
             Line::from(Span::styled(
@@ -177,7 +177,7 @@ fn draw_selections_for_number_of_players(f: &mut Frame, app: &App, chunk: Rect) 
                 },
             ))
         })
-        .collect::<Vec<_>>();
+        .collect();
     draw_selections(f, chunk, choices);
 }
 
@@ -186,7 +186,7 @@ where
     I: IntoIterator,
     I::Item: Into<Text<'a>>,
 {
-    let choices = choices.into_iter().map(|c| c.into()).collect::<Vec<_>>();
+    let choices: Vec<_> = choices.into_iter().map(|c| c.into()).collect();
     let choice_height = 1;
     let max_choice_str_len = choices.iter().map(|c| c.width()).max().unwrap() as u16;
     let rect_width = max_choice_str_len + SELECTION_MARGIN * 2;
@@ -391,44 +391,40 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
         }
     };
 
-    let mut score_rows = enum_iterator::all::<Boxes>()
+    let mut score_rows: Vec<_> = enum_iterator::all::<Boxes>()
         .map(|b| {
             Row::new(
                 vec![Cell::from(format!("{:>1$}", b, BOXES_CELL_WIDTH))]
                     .into_iter()
-                    .chain(
-                        (0..app.get_game_data().get_num_players())
-                            .map(|pid| {
-                                let st = &app.get_game_data().get_score_table(pid);
-                                let is_playing = is_playing(pid);
-                                let dice = dislay_dice(pid);
+                    .chain((0..app.get_game_data().get_num_players()).map(|pid| {
+                        let st = &app.get_game_data().get_score_table(pid);
+                        let is_playing = is_playing(pid);
+                        let dice = dislay_dice(pid);
 
-                                let text = if st.has_score_in(b) {
-                                    format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
-                                } else if let Some(d) = dice {
-                                    format!("{:>1$}", scoring(b, d), SCORE_CELL_WIDTH)
-                                } else {
-                                    String::new()
-                                };
+                        let text = if st.has_score_in(b) {
+                            format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
+                        } else if let Some(d) = dice {
+                            format!("{:>1$}", scoring(b, d), SCORE_CELL_WIDTH)
+                        } else {
+                            String::new()
+                        };
 
-                                let style = if is_playing && !st.has_score_in(b) {
-                                    let pos = app.get_play_cursor_pos().unwrap();
-                                    let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
-                                    if pos == &PlayCursorPos::Table(b) {
-                                        style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
-                                    }
-                                    style
-                                } else {
-                                    Style::default()
-                                };
+                        let style = if is_playing && !st.has_score_in(b) {
+                            let pos = app.get_play_cursor_pos().unwrap();
+                            let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
+                            if pos == &PlayCursorPos::Table(b) {
+                                style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
+                            }
+                            style
+                        } else {
+                            Style::default()
+                        };
 
-                                Cell::from(text).style(style)
-                            })
-                            .collect::<Vec<_>>(),
-                    ),
+                        Cell::from(text).style(style)
+                    })),
             )
         })
-        .collect::<Vec<_>>();
+        .collect();
     let bonus_cell = Row::new(
         vec![Cell::from(format!("{:>1$}", "Bonus", BOXES_CELL_WIDTH))]
             .into_iter()
@@ -528,22 +524,18 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
             })),
     );
     score_rows.push(total_cell);
-    let score_header = Row::new(
-        vec![Cell::from(String::from(""))].into_iter().chain(
-            (0..app.get_game_data().get_num_players())
-                .map(|pid| {
-                    let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
-                    let style = if is_playing(pid) {
-                        Style::default().fg(Color::Black).bg(Color::LightYellow)
-                    } else {
-                        Style::default()
-                    };
-                    Cell::from(text).style(style)
-                })
-                .collect::<Vec<_>>(),
-        ),
-    );
-    let score_table_width = (0..(app.get_game_data().get_num_players() + 1))
+    let score_header = Row::new(vec![Cell::from(String::from(""))].into_iter().chain(
+        (0..app.get_game_data().get_num_players()).map(|pid| {
+            let text = format!("{:^1$}", format!("Player{}", pid), SCORE_CELL_WIDTH);
+            let style = if is_playing(pid) {
+                Style::default().fg(Color::Black).bg(Color::LightYellow)
+            } else {
+                Style::default()
+            };
+            Cell::from(text).style(style)
+        }),
+    ));
+    let score_table_width: Vec<_> = (0..(app.get_game_data().get_num_players() + 1))
         .map(|x| {
             Constraint::Length(if x == 0 {
                 BOXES_CELL_WIDTH as u16
@@ -551,7 +543,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 SCORE_CELL_WIDTH as u16
             })
         })
-        .collect::<Vec<_>>();
+        .collect();
     let score_block = Table::new(score_rows, &score_table_width)
         .style(
             Style::default()
@@ -593,11 +585,11 @@ fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
         .constraints([Constraint::Percentage(100)])
         .split(create_centerd_rect(chunk, width + 2, height + 2));
 
-    let mut results = (0..app.get_game_data().get_num_players())
+    let mut results: Vec<_> = (0..app.get_game_data().get_num_players())
         .map(|i| (i, app.get_game_data().get_score_table(i).get_total_score()))
-        .collect::<Vec<_>>();
+        .collect();
     results.sort_by(|(.., left), (.., right)| left.cmp(right).reverse());
-    let mut results = results
+    let mut results: Vec<_> = results
         .iter()
         .map(|(pid, score)| {
             let rank = results.iter().position(|(.., s)| s == score).unwrap() + 1;
@@ -606,7 +598,7 @@ fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
                 Style::default(),
             ))
         })
-        .collect::<Vec<_>>();
+        .collect();
     results.extend([
         Line::from(Span::raw("")),
         Line::from(Span::styled(
