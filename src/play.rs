@@ -1,11 +1,32 @@
 use crate::hand::Hand;
+use anyhow::{anyhow, bail, Result};
 use array_macro::array;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum PlayPhaseError {
+    #[error("Unexpected PlayPhase")]
+    UnexpectedPlayPhase,
+    #[error("Unexpected roll count")]
+    UnexpectedRollCount,
+    #[error("Current Play has already rinished")]
+    FinishedPlay,
+    #[error("Try to roll while not in the roll phase")]
+    DisAllowedRoll,
+    #[error("No dice to roll")]
+    NoDiceToRoll,
+}
 
 pub enum PlayPhase {
     Init,
     Roll(usize),
     SelectOrReroll(usize),
     Select,
+}
+
+impl PlayPhase {
+    pub const INIT_ROLL_COUNT: usize = 1;
+    pub const MAX_ROLL_COUNT: usize = 3;
 }
 
 pub struct Play {
@@ -16,6 +37,8 @@ pub struct Play {
 }
 
 impl Play {
+    pub const MAX_ROLL_COUNT: usize = 3;
+
     pub fn new(player_id: usize) -> Self {
         Self {
             player_id,
@@ -25,22 +48,62 @@ impl Play {
         }
     }
 
-    pub fn start_first_roll(&mut self) {
+    fn start_first_roll(&mut self) {
         self.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
-        self.phase = PlayPhase::Roll(0);
     }
 
-    pub fn reroll_dice(&mut self) -> usize {
-        let removes: Vec<_> = self.is_held.iter().map(|&is_heled| !is_heled).collect();
-        self.hand.remove_dice(&removes);
+    pub fn reroll_dice(&mut self) -> Result<()> {
+        if let PlayPhase::Roll(..) = self.phase {
+            let removes: Vec<_> = self.is_held.iter().map(|&is_heled| !is_heled).collect();
+            self.hand.remove_dice(&removes);
 
-        let reroll_dices = removes.iter().filter(|&&e| e).count();
-        let rests = Hand::DICE_NUM - reroll_dices;
-        self.is_held = array![i => i < rests; Hand::DICE_NUM];
-        self.hand
-            .add_dice(&Hand::new_with_random_n_dice(reroll_dices));
+            let reroll_dices = removes.iter().filter(|&&e| e).count();
+            let rests = Hand::DICE_NUM - reroll_dices;
+            self.is_held = array![i => i < rests; Hand::DICE_NUM];
+            self.hand
+                .add_dice(&Hand::new_with_random_n_dice(reroll_dices));
+            Ok(())
+        } else {
+            Err(anyhow!(PlayPhaseError::DisAllowedRoll))
+        }
+    }
 
-        reroll_dices
+    fn transition_phase(&self) -> Result<PlayPhase> {
+        Ok(match self.phase {
+            PlayPhase::Init => PlayPhase::Roll(PlayPhase::INIT_ROLL_COUNT),
+            PlayPhase::Roll(count) => {
+                if (PlayPhase::INIT_ROLL_COUNT..PlayPhase::MAX_ROLL_COUNT).contains(&count) {
+                    PlayPhase::SelectOrReroll(count)
+                } else if count == Self::MAX_ROLL_COUNT {
+                    PlayPhase::Select
+                } else {
+                    bail!(PlayPhaseError::UnexpectedRollCount)
+                }
+            }
+            PlayPhase::SelectOrReroll(count) => {
+                if (PlayPhase::INIT_ROLL_COUNT..PlayPhase::MAX_ROLL_COUNT).contains(&count) {
+                    if !self.get_is_held_all() {
+                        PlayPhase::Roll(count + 1)
+                    } else {
+                        bail!(PlayPhaseError::NoDiceToRoll)
+                    }
+                } else {
+                    bail!(PlayPhaseError::UnexpectedRollCount)
+                }
+            }
+            PlayPhase::Select => bail!(PlayPhaseError::FinishedPlay),
+        })
+    }
+
+    pub fn progress(&mut self) -> Result<()> {
+        self.phase = self.transition_phase()?;
+        match self.phase {
+            PlayPhase::Roll(PlayPhase::INIT_ROLL_COUNT) => self.start_first_roll(),
+            PlayPhase::Roll(..) => self.reroll_dice()?,
+            PlayPhase::SelectOrReroll(..) | PlayPhase::Select => self.hold_all_dice(),
+            _ => bail!(PlayPhaseError::UnexpectedPlayPhase),
+        };
+        Ok(())
     }
 
     /* helper functions */
@@ -82,9 +145,5 @@ impl Play {
 
     pub fn get_phase(&self) -> &PlayPhase {
         &self.phase
-    }
-
-    pub fn set_phase(&mut self, phase: PlayPhase) {
-        self.phase = phase;
     }
 }

@@ -1,7 +1,7 @@
 use crate::events::{Actions, InputEvent};
 use crate::game_data::GameData;
 use crate::hand::Hand;
-use crate::play::{Play, PlayPhase};
+use crate::play::{Play, PlayPhase, PlayPhaseError};
 use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
 use enum_iterator::{all, first, last, Sequence};
@@ -158,8 +158,6 @@ impl Default for App {
 }
 
 impl App {
-    const MAX_ROLL_COUNT: usize = 3;
-
     pub fn new() -> Self {
         Self {
             state: AppState::StartMenu(StartMenuSelection::Play),
@@ -338,7 +336,7 @@ impl App {
 
             Actions::Select => {
                 let play = self.state.get_mut_play_data().unwrap();
-                play.start_first_roll();
+                play.progress().unwrap();
                 AppReturn::Continue
             }
 
@@ -364,28 +362,29 @@ impl App {
 
             Actions::Select => {
                 let play = self.state.get_mut_play_data().unwrap();
-                let count = if let PlayPhase::Roll(count) = play.get_phase() {
-                    count + 1
-                } else {
-                    panic!("Unexpected status!")
-                };
 
-                play.hold_all_dice();
-                if count < App::MAX_ROLL_COUNT {
-                    play.set_phase(PlayPhase::SelectOrReroll(count));
-                    self.state
-                        .set_play_cursor_pos(PlayCursorPos::Hand(0))
-                        .unwrap();
-                } else {
-                    play.set_phase(PlayPhase::Select);
-                    self.move_cursor_pos_to_table();
+                play.progress().unwrap();
+                match play.get_phase() {
+                    PlayPhase::SelectOrReroll(..) => {
+                        self.state
+                            .set_play_cursor_pos(PlayCursorPos::Hand(0))
+                            .unwrap();
+                    }
+                    PlayPhase::Select => {
+                        self.move_cursor_pos_to_table();
+                    }
+                    _ => panic!("Unexpected PlayPhase"),
                 }
 
                 AppReturn::Continue
             }
 
             _ => {
-                self.state.get_mut_play_data().unwrap().reroll_dice();
+                self.state
+                    .get_mut_play_data()
+                    .unwrap()
+                    .reroll_dice()
+                    .unwrap();
                 AppReturn::Continue
             }
         }
@@ -462,15 +461,12 @@ impl App {
                 match self.state.get_play_cursor_pos().unwrap() {
                     PlayCursorPos::Roll => {
                         let play = self.state.get_mut_play_data().unwrap();
-                        if !play.get_is_held_all() {
-                            play.reroll_dice();
-                            play.set_phase(
-                                if let &PlayPhase::SelectOrReroll(count) = play.get_phase() {
-                                    PlayPhase::Roll(count)
-                                } else {
-                                    panic!("Unexpected status!")
-                                },
-                            );
+                        match play.progress() {
+                            Ok(..) => (),
+                            Err(e) => match e.downcast_ref::<PlayPhaseError>() {
+                                Some(PlayPhaseError::NoDiceToRoll) => (),
+                                _ => panic!("{}", e),
+                            },
                         }
                     }
                     &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
