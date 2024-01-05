@@ -98,12 +98,6 @@ impl ScoreTable {
         self.table.get_mut(&b).unwrap().fill(score);
     }
 
-    pub fn remaining_boxes(&self) -> Vec<Boxes> {
-        enum_iterator::all::<Boxes>()
-            .filter(|&b| self.has_score_in(b))
-            .collect()
-    }
-
     pub fn get_total_upper_score(&self) -> u32 {
         ScoreTable::BONUS_TARGETS
             .iter()
