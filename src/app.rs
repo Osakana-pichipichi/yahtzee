@@ -1,9 +1,9 @@
 use crate::events::{Actions, InputEvent};
+use crate::game_data::GameData;
 use crate::hand::Hand;
-use crate::score_table::ScoreTable;
+use crate::play::{Play, PlayPhase};
 use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
-use array_macro::array;
 use enum_iterator::{all, first, last, Sequence};
 use std::fmt;
 use thiserror::Error;
@@ -21,49 +21,6 @@ pub enum PlayCursorPos {
     Dust(usize),
     Table(Boxes),
     Disappear,
-}
-
-pub enum PlayPhase {
-    Init,
-    Roll(usize),
-    SelectOrReroll(usize),
-    Select,
-}
-
-pub struct Play {
-    pub player_id: usize,
-    pub hand: Hand,
-    pub is_held: [bool; Hand::DICE_NUM],
-    pub phase: PlayPhase,
-}
-
-impl Play {
-    fn new(player_id: usize) -> Self {
-        Self {
-            player_id,
-            hand: Hand::new_with_random_n_dice(0),
-            is_held: [false; 5],
-            phase: PlayPhase::Init,
-        }
-    }
-
-    pub fn start_first_roll(&mut self) {
-        self.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
-        self.phase = PlayPhase::Roll(0);
-    }
-
-    pub fn reroll_dice(&mut self) -> usize {
-        let removes: Vec<_> = self.is_held.iter().map(|&is_heled| !is_heled).collect();
-        self.hand.remove_dice(&removes);
-
-        let reroll_dices = removes.iter().filter(|&&e| e).count();
-        let rests = Hand::DICE_NUM - reroll_dices;
-        self.is_held = array![i => i < rests; Hand::DICE_NUM];
-        self.hand
-            .add_dice(&Hand::new_with_random_n_dice(reroll_dices));
-
-        reroll_dices
-    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -187,57 +144,6 @@ pub enum AppStateError {
     NoPlayData,
     #[error("Play data has already existed")]
     ExistPlayData,
-}
-
-pub struct GameData {
-    num_players: usize,
-    scores: Vec<ScoreTable>,
-}
-
-impl GameData {
-    pub fn new(num_players: usize) -> Self {
-        Self {
-            num_players,
-            scores: (0..num_players).map(|_| ScoreTable::new()).collect(),
-        }
-    }
-
-    pub fn get_score_table(&self, player_id: usize) -> &ScoreTable {
-        if player_id >= self.num_players {
-            panic!(
-                "Unexpected player_id: {} (total players: {})",
-                player_id, self.num_players
-            );
-        };
-
-        &self.scores[player_id]
-    }
-
-    pub fn get_mut_score_table(&mut self, player_id: usize) -> &mut ScoreTable {
-        if player_id >= self.num_players {
-            panic!(
-                "Unexpected player_id: {} (total players: {})",
-                player_id, self.num_players
-            );
-        };
-
-        &mut self.scores[player_id]
-    }
-
-    pub fn get_num_players(&self) -> usize {
-        self.num_players
-    }
-
-    pub fn current_player_id(&self) -> usize {
-        let pid_to_filled_scores: Vec<_> = self
-            .scores
-            .iter()
-            .map(|e| e.get_num_filled_scores())
-            .collect();
-        (1..self.get_num_players())
-            .find(|&i| pid_to_filled_scores[i - 1] > pid_to_filled_scores[i])
-            .unwrap_or(0)
-    }
 }
 
 pub struct App {
@@ -400,7 +306,7 @@ impl App {
 
     fn do_action_in_play(&mut self, input_event: InputEvent) -> AppReturn {
         match self.state.get_play_data() {
-            Ok(play) => match play.phase {
+            Ok(play) => match play.get_phase() {
                 PlayPhase::Init => self.do_action_in_init(input_event),
                 PlayPhase::Roll(..) => self.do_action_in_roll(input_event),
                 PlayPhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
@@ -441,7 +347,7 @@ impl App {
     }
 
     fn move_cursor_pos_to_table(&mut self) {
-        let pid = self.state.get_mut_play_data().unwrap().player_id;
+        let pid = self.state.get_mut_play_data().unwrap().get_player_id();
         for pos in all::<Boxes>() {
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
                 self.state
@@ -458,20 +364,20 @@ impl App {
 
             Actions::Select => {
                 let play = self.state.get_mut_play_data().unwrap();
-                let count = if let PlayPhase::Roll(count) = play.phase {
+                let count = if let PlayPhase::Roll(count) = play.get_phase() {
                     count + 1
                 } else {
                     panic!("Unexpected status!")
                 };
 
-                play.is_held = [true; Hand::DICE_NUM];
+                play.hold_all_dice();
                 if count < App::MAX_ROLL_COUNT {
-                    play.phase = PlayPhase::SelectOrReroll(count);
+                    play.set_phase(PlayPhase::SelectOrReroll(count));
                     self.state
                         .set_play_cursor_pos(PlayCursorPos::Hand(0))
                         .unwrap();
                 } else {
-                    play.phase = PlayPhase::Select;
+                    play.set_phase(PlayPhase::Select);
                     self.move_cursor_pos_to_table();
                 }
 
@@ -490,7 +396,7 @@ impl App {
             let mut pos = init_pos;
             loop {
                 let prev = pos.previous().unwrap_or_else(|| last::<Boxes>().unwrap());
-                let pid = self.state.get_play_data().unwrap().player_id;
+                let pid = self.state.get_play_data().unwrap().get_player_id();
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(prev);
                 if !has_score || prev == init_pos {
                     self.state
@@ -510,7 +416,7 @@ impl App {
             let mut pos = init_pos;
             loop {
                 let next = pos.next().unwrap_or_else(|| first::<Boxes>().unwrap());
-                let pid = self.state.get_play_data().unwrap().player_id;
+                let pid = self.state.get_play_data().unwrap().get_player_id();
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(next);
                 if !has_score || next == init_pos {
                     self.state
@@ -528,9 +434,9 @@ impl App {
     fn confirm_score_action(&mut self) {
         if let &PlayCursorPos::Table(pos) = self.state.get_play_cursor_pos().unwrap() {
             let play = self.state.get_play_data().unwrap();
-            let pid = play.player_id;
+            let pid = play.get_player_id();
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
-                let dice = play.hand.get_dice().to_vec();
+                let dice = play.get_hand().to_vec();
                 let score_table = self.get_mut_game_data().get_mut_score_table(pid);
                 score_table.confirm_score(pos, scoring(pos, &dice));
                 let next_pid = (pid + 1) % self.get_game_data().get_num_players();
@@ -556,18 +462,20 @@ impl App {
                 match self.state.get_play_cursor_pos().unwrap() {
                     PlayCursorPos::Roll => {
                         let play = self.state.get_mut_play_data().unwrap();
-                        if !play.is_held.iter().all(|&x| x) {
+                        if !play.get_is_held_all() {
                             play.reroll_dice();
-                            play.phase = if let PlayPhase::SelectOrReroll(count) = play.phase {
-                                PlayPhase::Roll(count)
-                            } else {
-                                panic!("Unexpected status!")
-                            };
+                            play.set_phase(
+                                if let &PlayPhase::SelectOrReroll(count) = play.get_phase() {
+                                    PlayPhase::Roll(count)
+                                } else {
+                                    panic!("Unexpected status!")
+                                },
+                            );
                         }
                     }
                     &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
                         let play = self.state.get_mut_play_data().unwrap();
-                        play.is_held[pos] = !play.is_held[pos]
+                        play.set_is_held(pos, !play.get_is_held(pos));
                     }
                     PlayCursorPos::Table(..) => {
                         self.confirm_score_action();
@@ -637,7 +545,7 @@ impl App {
                 match self.state.get_play_cursor_pos().unwrap() {
                     PlayCursorPos::Hand(..) => {
                         let play = self.state.get_play_data().unwrap();
-                        if !play.is_held.iter().all(|&x| x) {
+                        if !play.get_is_held_all() {
                             self.state.set_play_cursor_pos(PlayCursorPos::Roll).unwrap();
                         }
                     }

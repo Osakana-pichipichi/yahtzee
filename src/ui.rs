@@ -1,9 +1,10 @@
 use crate::app::{
-    App, AppState, AppStateError, NumPlayersSelection, PlayCursorPos, PlayPhase,
-    StartMenuSelection, HIGHEST_PLAYER_ID, LOWEST_PLAYER_ID,
+    App, AppState, AppStateError, NumPlayersSelection, PlayCursorPos, StartMenuSelection,
+    HIGHEST_PLAYER_ID, LOWEST_PLAYER_ID,
 };
 use crate::assets;
 use crate::hand::Hand;
+use crate::play::PlayPhase;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
 use ratatui::{
@@ -253,7 +254,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
 
     match app.get_state().get_play_data() {
         Ok(play) => {
-            for (i, &d) in play.hand.get_dice().iter().enumerate() {
+            for (i, &d) in play.get_hand().iter().enumerate() {
                 let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
                 let dice_num = Hand::DICE_NUM as u16;
                 let rect_width = dice_width * dice_num + HAND_MARGIN * (dice_num - 1);
@@ -273,7 +274,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     ])
                     .split(create_centerd_rect(chunk, rect_width, rect_height));
 
-                let text = match (&play.phase, play.is_held[i]) {
+                let text = match (play.get_phase(), play.get_is_held(i)) {
                     (PlayPhase::Roll(..), ..) | (.., true) => (0..DICE_STR_HEIGHT)
                         .map(|h| {
                             Line::from(Span::styled(
@@ -285,7 +286,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     _ => vec![],
                 };
                 let text = Paragraph::new(text)
-                    .block(match (&play.phase, play.is_held[i]) {
+                    .block(match (play.get_phase(), play.get_is_held(i)) {
                         (PlayPhase::Roll(..), ..) | (.., true) => {
                             Block::default().borders(Borders::ALL)
                         }
@@ -338,8 +339,8 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                 ])
                 .split(create_centerd_rect(chunk, rect_width, rect_height));
 
-            for (i, &d) in play.hand.get_dice().iter().enumerate() {
-                let text = match (&play.phase, play.is_held[i]) {
+            for (i, &d) in play.get_hand().iter().enumerate() {
+                let text = match (play.get_phase(), play.get_is_held(i)) {
                     (PlayPhase::Roll(..), ..) | (.., true) => vec![],
                     _ => (0..DICE_STR_HEIGHT)
                         .map(|h| {
@@ -351,7 +352,7 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                         .collect(),
                 };
                 let text = Paragraph::new(text)
-                    .block(match (&play.phase, play.is_held[i]) {
+                    .block(match (play.get_phase(), play.get_is_held(i)) {
                         (PlayPhase::Roll(..), ..) | (.., true) => Block::default(),
                         _ => Block::default().borders(Borders::ALL),
                     })
@@ -380,13 +381,13 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
 fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
     let is_playing = |pid: usize| -> bool {
         match app.get_state().get_play_data() {
-            Ok(play) => pid == play.player_id,
+            Ok(play) => pid == play.get_player_id(),
             _ => false,
         }
     };
     let dislay_dice = |pid: usize| -> Option<&[u32]> {
         match app.get_state().get_play_data() {
-            Ok(p) if is_playing(pid) => Some(p.hand.get_dice()),
+            Ok(p) if is_playing(pid) => Some(p.get_hand()),
             _ => None,
         }
     };

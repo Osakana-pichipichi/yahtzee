@@ -1,7 +1,9 @@
 mod app;
 mod assets;
 mod events;
+mod game_data;
 mod hand;
+mod play;
 mod score_table;
 mod scoring;
 mod ui;
