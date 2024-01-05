@@ -1,7 +1,7 @@
 use crate::events::{Actions, InputEvent};
 use crate::game_data::GameData;
-use crate::hand::Hand;
-use crate::play::{Play, PlayPhase, PlayPhaseError};
+use crate::hand::{Hand, HandOpError};
+use crate::play::{Play, PlayPhase};
 use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
 use enum_iterator::{all, first, last, Sequence};
@@ -383,6 +383,7 @@ impl App {
                 self.state
                     .get_mut_play_data()
                     .unwrap()
+                    .get_mut_hand()
                     .reroll_dice()
                     .unwrap();
                 AppReturn::Continue
@@ -435,7 +436,7 @@ impl App {
             let play = self.state.get_play_data().unwrap();
             let pid = play.get_player_id();
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
-                let dice = play.get_hand().to_vec();
+                let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
                 let score_table = self.get_mut_game_data().get_mut_score_table(pid);
                 score_table.confirm_score(pos, scoring(pos, &dice));
                 let next_pid = (pid + 1) % self.get_game_data().get_num_players();
@@ -463,15 +464,15 @@ impl App {
                         let play = self.state.get_mut_play_data().unwrap();
                         match play.progress() {
                             Ok(..) => (),
-                            Err(e) => match e.downcast_ref::<PlayPhaseError>() {
-                                Some(PlayPhaseError::NoDiceToRoll) => (),
+                            Err(e) => match e.downcast_ref::<HandOpError>() {
+                                Some(HandOpError::NoDiceToRoll) => (),
                                 _ => panic!("{}", e),
                             },
                         }
                     }
                     &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
-                        let play = self.state.get_mut_play_data().unwrap();
-                        play.set_is_held(pos, !play.get_is_held(pos));
+                        let hand = self.state.get_mut_play_data().unwrap().get_mut_hand();
+                        hand.hold(pos, !hand.is_held(pos).unwrap()).unwrap();
                     }
                     PlayCursorPos::Table(..) => {
                         self.confirm_score_action();
@@ -541,7 +542,7 @@ impl App {
                 match self.state.get_play_cursor_pos().unwrap() {
                     PlayCursorPos::Hand(..) => {
                         let play = self.state.get_play_data().unwrap();
-                        if !play.get_is_held_all() {
+                        if !play.get_hand().is_held_all().unwrap() {
                             self.state.set_play_cursor_pos(PlayCursorPos::Roll).unwrap();
                         }
                     }

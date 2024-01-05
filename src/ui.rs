@@ -3,7 +3,7 @@ use crate::app::{
     HIGHEST_PLAYER_ID, LOWEST_PLAYER_ID,
 };
 use crate::assets;
-use crate::hand::Hand;
+use crate::hand::{Hand, HandOpError};
 use crate::play::PlayPhase;
 use crate::score_table::ScoreTable;
 use crate::scoring::{scoring, Boxes};
@@ -254,7 +254,9 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
 
     match app.get_state().get_play_data() {
         Ok(play) => {
-            for (i, &d) in play.get_hand().iter().enumerate() {
+            let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
+            for (i, d) in dice.iter().enumerate() {
+                let hand = play.get_hand();
                 let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
                 let dice_num = Hand::DICE_NUM as u16;
                 let rect_width = dice_width * dice_num + HAND_MARGIN * (dice_num - 1);
@@ -274,7 +276,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     ])
                     .split(create_centerd_rect(chunk, rect_width, rect_height));
 
-                let text = match (play.get_phase(), play.get_is_held(i)) {
+                let text = match (play.get_phase(), hand.is_held(i).unwrap()) {
                     (PlayPhase::Roll(..), ..) | (.., true) => (0..DICE_STR_HEIGHT)
                         .map(|h| {
                             Line::from(Span::styled(
@@ -286,7 +288,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     _ => vec![],
                 };
                 let text = Paragraph::new(text)
-                    .block(match (play.get_phase(), play.get_is_held(i)) {
+                    .block(match (play.get_phase(), hand.is_held(i).unwrap()) {
                         (PlayPhase::Roll(..), ..) | (.., true) => {
                             Block::default().borders(Borders::ALL)
                         }
@@ -339,8 +341,10 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                 ])
                 .split(create_centerd_rect(chunk, rect_width, rect_height));
 
-            for (i, &d) in play.get_hand().iter().enumerate() {
-                let text = match (play.get_phase(), play.get_is_held(i)) {
+            let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
+            for (i, d) in dice.iter().enumerate() {
+                let hand = play.get_hand();
+                let text = match (play.get_phase(), hand.is_held(i).unwrap()) {
                     (PlayPhase::Roll(..), ..) | (.., true) => vec![],
                     _ => (0..DICE_STR_HEIGHT)
                         .map(|h| {
@@ -352,7 +356,7 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                         .collect(),
                 };
                 let text = Paragraph::new(text)
-                    .block(match (play.get_phase(), play.get_is_held(i)) {
+                    .block(match (play.get_phase(), hand.is_held(i).unwrap()) {
                         (PlayPhase::Roll(..), ..) | (.., true) => Block::default(),
                         _ => Block::default().borders(Borders::ALL),
                     })
@@ -385,9 +389,9 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
             _ => false,
         }
     };
-    let dislay_dice = |pid: usize| -> Option<&[u32]> {
+    let dislay_dice = |pid: usize| -> Option<Vec<u32>> {
         match app.get_state().get_play_data() {
-            Ok(p) if is_playing(pid) => Some(p.get_hand()),
+            Ok(p) if is_playing(pid) => Some(HandOpError::unwrap_pips(p.get_hand().get_pips())),
             _ => None,
         }
     };
@@ -405,7 +409,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                         let text = if st.has_score_in(b) {
                             format!("{:>1$}", st.get_score(b).unwrap(), SCORE_CELL_WIDTH)
                         } else if let Some(d) = dice {
-                            format!("{:>1$}", scoring(b, d), SCORE_CELL_WIDTH)
+                            format!("{:>1$}", scoring(b, &d), SCORE_CELL_WIDTH)
                         } else {
                             String::new()
                         };
@@ -501,7 +505,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
 
                 let default_text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let default_style = Style::default();
-                let (text, style) = if let (true, Some(d)) = (is_playing, dice) {
+                let (text, style) = if let (true, Some(d)) = (is_playing, &dice) {
                     let pos = app.get_state().get_play_cursor_pos().unwrap();
                     let if_total_score = if let &PlayCursorPos::Table(b) = pos {
                         st.get_total_score_if_filled_by(b, scoring(b, d))

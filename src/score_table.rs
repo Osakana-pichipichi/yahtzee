@@ -1,4 +1,4 @@
-use crate::hand::Hand;
+use crate::hand::{Die, Hand};
 use crate::scoring::Boxes;
 use std::collections::HashMap;
 
@@ -58,7 +58,7 @@ impl ScoreTable {
         /* This means (1 + 2 + 3 + 4 + 5 + 6) * 3. */
         let mut sum = 0;
         let mut i = 1;
-        while i <= Hand::PIPS.len() {
+        while i <= Die::PIPS.len() {
             sum += i;
             i += 1;
         }
@@ -227,7 +227,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
@@ -237,7 +237,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3
+            Die::PIPS[1..].iter().sum::<u32>() * 3
         );
 
         let mut score_table = ScoreTable::new();
@@ -247,7 +247,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 2
+            Die::PIPS[1..].iter().sum::<u32>() * 2
         );
     }
 
@@ -270,7 +270,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(Boxes::Chance, 20),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
@@ -281,11 +281,11 @@ mod tests {
         let (b, p) = ScoreTable::BONUS_TARGETS[0];
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(b, p * 3),
-            Hand::PIPS.iter().sum::<u32>() * 3
+            Die::PIPS.iter().sum::<u32>() * 3
         );
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(b, p * 2),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3 + 2
+            Die::PIPS[1..].iter().sum::<u32>() * 3 + 2
         );
     }
 
@@ -369,7 +369,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
@@ -379,7 +379,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3
+            Die::PIPS[1..].iter().sum::<u32>() * 3
         );
 
         let mut score_table = ScoreTable::new();
@@ -389,7 +389,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 2
+            Die::PIPS[1..].iter().sum::<u32>() * 2
         );
     }
 
@@ -412,7 +412,7 @@ mod tests {
 
         assert_eq!(
             score_table.get_total_score_if_filled_by(Boxes::Chance, 20),
-            Hand::PIPS.iter().sum::<u32>() * 2 + 20
+            Die::PIPS.iter().sum::<u32>() * 2 + 20
         );
 
         let mut score_table = ScoreTable::new();
@@ -423,11 +423,11 @@ mod tests {
         let (b, p) = ScoreTable::BONUS_TARGETS[0];
         assert_eq!(
             score_table.get_total_score_if_filled_by(b, p * 3),
-            Hand::PIPS.iter().sum::<u32>() * 3 + ScoreTable::BONUS_POINT
+            Die::PIPS.iter().sum::<u32>() * 3 + ScoreTable::BONUS_POINT
         );
         assert_eq!(
             score_table.get_total_score_if_filled_by(b, p * 2),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3 + 2
+            Die::PIPS[1..].iter().sum::<u32>() * 3 + 2
         );
     }
 }
