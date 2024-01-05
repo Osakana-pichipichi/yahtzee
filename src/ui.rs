@@ -82,7 +82,7 @@ const HAND_MARGIN: u16 = 1;
 const DUST_MARGIN: u16 = 1;
 
 pub fn draw_ui(f: &mut Frame, app: &App) {
-    match app.state {
+    match app.get_state() {
         AppState::StartMenu(..) => draw_start_menu(f, app),
         AppState::SelectNumPlayers(..) => draw_select_number_of_players(f, app),
         AppState::Play(..) => draw_play_ui(f, app),
@@ -137,7 +137,7 @@ fn draw_logo(f: &mut Frame, chunk: Rect) {
 }
 
 fn draw_start_menu_selections(f: &mut Frame, app: &App, chunk: Rect) {
-    let AppState::StartMenu(pos) = &app.state else {
+    let AppState::StartMenu(pos) = app.get_state() else {
         panic!("Unexpected state")
     };
     let choices = [StartMenuSelection::Play, StartMenuSelection::Exit];
@@ -158,7 +158,7 @@ fn draw_start_menu_selections(f: &mut Frame, app: &App, chunk: Rect) {
 }
 
 fn draw_selections_for_number_of_players(f: &mut Frame, app: &App, chunk: Rect) {
-    let AppState::SelectNumPlayers(pos) = &app.state else {
+    let AppState::SelectNumPlayers(pos) = app.get_state() else {
         panic!("Unexpected state")
     };
     let choices: Vec<_> = (LOWEST_PLAYER_ID..=HIGHEST_PLAYER_ID)
@@ -239,7 +239,7 @@ fn draw_roll_block(f: &mut Frame, app: &App, chunk: Rect) {
         .split(create_centerd_rect(chunk, 13, 3));
     let text = Paragraph::new(Line::from(Span::styled("Roll!", Style::default())))
         .block(Block::default().borders(Borders::ALL))
-        .style(match app.get_play_cursor_pos().unwrap() {
+        .style(match app.get_state().get_play_cursor_pos().unwrap() {
             PlayCursorPos::Roll => Style::default().fg(Color::DarkGray).bg(Color::White),
             _ => Style::default(),
         })
@@ -251,7 +251,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
     let block = Block::default().title("Dice").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    match app.get_play_data() {
+    match app.get_state().get_play_data() {
         Ok(play) => {
             for (i, &d) in play.hand.get_dice().iter().enumerate() {
                 let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
@@ -291,7 +291,7 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                         }
                         _ => Block::default(),
                     })
-                    .style(match app.get_play_cursor_pos().unwrap() {
+                    .style(match app.get_state().get_play_cursor_pos().unwrap() {
                         &PlayCursorPos::Hand(pos) => {
                             if i == pos {
                                 Style::default().fg(Color::DarkGray).bg(Color::White)
@@ -317,7 +317,7 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
     let block = Block::default().title("Dust").borders(Borders::ALL);
     f.render_widget(block, chunk);
 
-    match app.get_play_data() {
+    match app.get_state().get_play_data() {
         Ok(play) => {
             let dice_width = DICE_STR_WIDTH as u16 + DICE_MARGIN * 2;
             let dice_num = Hand::DICE_NUM as u16;
@@ -355,7 +355,7 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                         (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
                         _ => Block::default().borders(Borders::ALL),
                     })
-                    .style(match app.get_play_cursor_pos().unwrap() {
+                    .style(match app.get_state().get_play_cursor_pos().unwrap() {
                         &PlayCursorPos::Dust(pos) => {
                             if i == pos {
                                 Style::default().fg(Color::DarkGray).bg(Color::White)
@@ -379,13 +379,13 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
 
 fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
     let is_playing = |pid: usize| -> bool {
-        match app.get_play_data() {
+        match app.get_state().get_play_data() {
             Ok(play) => pid == play.player_id,
             _ => false,
         }
     };
     let dislay_dice = |pid: usize| -> Option<&[u32]> {
-        match app.get_play_data() {
+        match app.get_state().get_play_data() {
             Ok(p) if is_playing(pid) => Some(p.hand.get_dice()),
             _ => None,
         }
@@ -410,7 +410,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                         };
 
                         let style = if is_playing && !st.has_score_in(b) {
-                            let pos = app.get_play_cursor_pos().unwrap();
+                            let pos = app.get_state().get_play_cursor_pos().unwrap();
                             let mut style = Style::default().fg(Color::Rgb(255, 215, 0));
                             if pos == &PlayCursorPos::Table(b) {
                                 style = style.fg(Color::Black).bg(Color::Rgb(255, 215, 0));
@@ -438,7 +438,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let (bstext, bsstyle) = if let Some(score) = st.calculate_bonus() {
                     (format!("{:>2}", score), default_bsstyle)
                 } else if let (true, Some(d)) = (is_playing, &dice) {
-                    let pos = app.get_play_cursor_pos().unwrap();
+                    let pos = app.get_state().get_play_cursor_pos().unwrap();
                     let ifbs = if let &PlayCursorPos::Table(b) = pos {
                         st.calculate_bonus_if_filled_by(b, scoring(b, d))
                     } else {
@@ -461,7 +461,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let default_ustext = format!("{:>3}", us);
                 let default_usstyle = Style::default();
                 let (ustext, usstyle) = if let (true, Some(d)) = (is_playing, &dice) {
-                    let pos = app.get_play_cursor_pos().unwrap();
+                    let pos = app.get_state().get_play_cursor_pos().unwrap();
                     let ifus = if let &PlayCursorPos::Table(b) = pos {
                         st.get_total_upper_score_if_filled_by(b, scoring(b, d))
                     } else {
@@ -501,7 +501,7 @@ fn draw_score_table(f: &mut Frame, app: &App, chunk: Rect) {
                 let default_text = format!("{:>1$}", total_score, SCORE_CELL_WIDTH);
                 let default_style = Style::default();
                 let (text, style) = if let (true, Some(d)) = (is_playing, dice) {
-                    let pos = app.get_play_cursor_pos().unwrap();
+                    let pos = app.get_state().get_play_cursor_pos().unwrap();
                     let if_total_score = if let &PlayCursorPos::Table(b) = pos {
                         st.get_total_score_if_filled_by(b, scoring(b, d))
                     } else {
@@ -569,7 +569,7 @@ fn draw_result_ui(f: &mut Frame, app: &App) {
 }
 
 fn draw_result(f: &mut Frame, app: &App, chunk: Rect) {
-    match app.state {
+    match app.get_state() {
         AppState::Result => (),
         _ => panic!(),
     }
