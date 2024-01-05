@@ -1,5 +1,5 @@
 use crate::app::{
-    App, AppState, AppStateError, GamePhase, NumPlayersSelection, PlayCursorPos,
+    App, AppState, AppStateError, NumPlayersSelection, PlayCursorPos, PlayPhase,
     StartMenuSelection, HIGHEST_PLAYER_ID, LOWEST_PLAYER_ID,
 };
 use crate::assets;
@@ -273,8 +273,8 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     ])
                     .split(create_centerd_rect(chunk, rect_width, rect_height));
 
-                let text = match (&play.game_phase, play.is_held[i]) {
-                    (GamePhase::Roll(..), ..) | (.., true) => (0..DICE_STR_HEIGHT)
+                let text = match (&play.phase, play.is_held[i]) {
+                    (PlayPhase::Roll(..), ..) | (.., true) => (0..DICE_STR_HEIGHT)
                         .map(|h| {
                             Line::from(Span::styled(
                                 DICE_STR[(d - 1) as usize][h],
@@ -285,8 +285,8 @@ fn draw_hand_block(f: &mut Frame, app: &App, chunk: Rect) {
                     _ => vec![],
                 };
                 let text = Paragraph::new(text)
-                    .block(match (&play.game_phase, play.is_held[i]) {
-                        (GamePhase::Roll(..), ..) | (.., true) => {
+                    .block(match (&play.phase, play.is_held[i]) {
+                        (PlayPhase::Roll(..), ..) | (.., true) => {
                             Block::default().borders(Borders::ALL)
                         }
                         _ => Block::default(),
@@ -339,8 +339,8 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                 .split(create_centerd_rect(chunk, rect_width, rect_height));
 
             for (i, &d) in play.hand.get_dice().iter().enumerate() {
-                let text = match (&play.game_phase, play.is_held[i]) {
-                    (GamePhase::Roll(..), ..) | (.., true) => vec![],
+                let text = match (&play.phase, play.is_held[i]) {
+                    (PlayPhase::Roll(..), ..) | (.., true) => vec![],
                     _ => (0..DICE_STR_HEIGHT)
                         .map(|h| {
                             Line::from(Span::styled(
@@ -351,8 +351,8 @@ fn draw_dust_block(f: &mut Frame, app: &App, chunk: Rect) {
                         .collect(),
                 };
                 let text = Paragraph::new(text)
-                    .block(match (&play.game_phase, play.is_held[i]) {
-                        (GamePhase::Roll(..), ..) | (.., true) => Block::default(),
+                    .block(match (&play.phase, play.is_held[i]) {
+                        (PlayPhase::Roll(..), ..) | (.., true) => Block::default(),
                         _ => Block::default().borders(Borders::ALL),
                     })
                     .style(match app.get_state().get_play_cursor_pos().unwrap() {

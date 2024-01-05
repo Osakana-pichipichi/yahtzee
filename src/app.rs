@@ -23,7 +23,7 @@ pub enum PlayCursorPos {
     Disappear,
 }
 
-pub enum GamePhase {
+pub enum PlayPhase {
     Init,
     Roll(usize),
     SelectOrReroll(usize),
@@ -34,22 +34,22 @@ pub struct Play {
     pub player_id: usize,
     pub hand: Hand,
     pub is_held: [bool; Hand::DICE_NUM],
-    pub game_phase: GamePhase,
+    pub phase: PlayPhase,
 }
 
 impl Play {
-    pub fn new(player_id: usize) -> Self {
+    fn new(player_id: usize) -> Self {
         Self {
             player_id,
             hand: Hand::new_with_random_n_dice(0),
             is_held: [false; 5],
-            game_phase: GamePhase::Init,
+            phase: PlayPhase::Init,
         }
     }
 
     pub fn start_first_roll(&mut self) {
         self.hand = Hand::new_with_random_n_dice(Hand::DICE_NUM);
-        self.game_phase = GamePhase::Roll(0);
+        self.phase = PlayPhase::Roll(0);
     }
 
     pub fn reroll_dice(&mut self) -> usize {
@@ -400,11 +400,11 @@ impl App {
 
     fn do_action_in_play(&mut self, input_event: InputEvent) -> AppReturn {
         match self.state.get_play_data() {
-            Ok(play) => match play.game_phase {
-                GamePhase::Init => self.do_action_in_init(input_event),
-                GamePhase::Roll(..) => self.do_action_in_roll(input_event),
-                GamePhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
-                GamePhase::Select => self.do_action_in_select(input_event),
+            Ok(play) => match play.phase {
+                PlayPhase::Init => self.do_action_in_init(input_event),
+                PlayPhase::Roll(..) => self.do_action_in_roll(input_event),
+                PlayPhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
+                PlayPhase::Select => self.do_action_in_select(input_event),
             },
             Err(e) => match e.downcast_ref::<AppStateError>().unwrap() {
                 AppStateError::NoPlayData => self.do_action_in_no_play_data(input_event),
@@ -458,7 +458,7 @@ impl App {
 
             Actions::Select => {
                 let play = self.state.get_mut_play_data().unwrap();
-                let count = if let GamePhase::Roll(count) = play.game_phase {
+                let count = if let PlayPhase::Roll(count) = play.phase {
                     count + 1
                 } else {
                     panic!("Unexpected status!")
@@ -466,12 +466,12 @@ impl App {
 
                 play.is_held = [true; Hand::DICE_NUM];
                 if count < App::MAX_ROLL_COUNT {
-                    play.game_phase = GamePhase::SelectOrReroll(count);
+                    play.phase = PlayPhase::SelectOrReroll(count);
                     self.state
                         .set_play_cursor_pos(PlayCursorPos::Hand(0))
                         .unwrap();
                 } else {
-                    play.game_phase = GamePhase::Select;
+                    play.phase = PlayPhase::Select;
                     self.move_cursor_pos_to_table();
                 }
 
@@ -558,12 +558,11 @@ impl App {
                         let play = self.state.get_mut_play_data().unwrap();
                         if !play.is_held.iter().all(|&x| x) {
                             play.reroll_dice();
-                            play.game_phase =
-                                if let GamePhase::SelectOrReroll(count) = play.game_phase {
-                                    GamePhase::Roll(count)
-                                } else {
-                                    panic!("Unexpected status!")
-                                };
+                            play.phase = if let PlayPhase::SelectOrReroll(count) = play.phase {
+                                PlayPhase::Roll(count)
+                            } else {
+                                panic!("Unexpected status!")
+                            };
                         }
                     }
                     &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
