@@ -81,10 +81,6 @@ impl Hand {
         Hand { dice: vec![] }
     }
 
-    pub fn get_dice(&self) -> &Vec<Die> {
-        &self.dice
-    }
-
     pub fn get_pips(&self) -> Result<Vec<u32>> {
         ensure!(self.dice.len() <= Self::DICE_NUM, HandOpError::TooBigHand);
 
