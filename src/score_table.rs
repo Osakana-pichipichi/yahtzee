@@ -91,10 +91,7 @@ impl ScoreTable {
     }
 
     pub fn has_all_scores(&self) -> bool {
-        self.table
-            .iter()
-            .map(|(.., row)| row.is_filled())
-            .all(|x| x)
+        self.table.iter().all(|(.., row)| row.is_filled())
     }
 
     pub fn get_num_filled_scores(&self) -> usize {
