@@ -16,10 +16,51 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
 use std::{cell::RefCell, io, panic, rc::Rc, time::Duration};
 
-pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
+struct TuiYatzee<B>
+where
+    B: Backend,
+{
+    app: Rc<RefCell<App>>,
+    events: Events,
+    terminal: Terminal<B>,
+}
+
+impl<B> TuiYatzee<B>
+where
+    B: Backend,
+{
+    fn new(app: Rc<RefCell<App>>, terminal: Terminal<B>) -> Self {
+        Self {
+            app,
+            events: Events::new(Duration::from_millis(30)),
+            terminal,
+        }
+    }
+
+    fn start(&mut self) -> Result<()> {
+        loop {
+            let mut app = self.app.borrow_mut();
+
+            self.terminal.draw(|f| draw_ui(f, &app))?;
+
+            let result = app.do_action(self.events.next()?);
+
+            if result == AppReturn::Exit {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn main() -> Result<()> {
     let panic_hook = panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen) {
@@ -32,36 +73,16 @@ pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
     }));
 
     enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(io::stdout(), EnterAlternateScreen)?;
 
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let tick_rate = Duration::from_millis(30);
-    let events = Events::new(tick_rate);
-
-    loop {
-        let mut app = app.borrow_mut();
-
-        terminal.draw(|f| draw_ui(f, &app))?;
-
-        let result = app.do_action(events.next()?);
-
-        if result == AppReturn::Exit {
-            break;
-        }
-    }
-
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-
-    Ok(())
-}
-
-fn main() -> Result<()> {
+    let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     let app = Rc::new(RefCell::new(App::new()));
-    start_ui(app)?;
-    Ok(())
+    let mut tui_yahtzee = TuiYatzee::new(app, terminal);
+
+    let ret = tui_yahtzee.start();
+
+    execute!(io::stdout(), LeaveAlternateScreen)?;
+    disable_raw_mode()?;
+
+    ret
 }
