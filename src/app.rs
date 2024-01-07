@@ -146,8 +146,6 @@ pub enum AppStateError {
     NoPlayData,
     #[error("Play data has already existed")]
     ExistPlayData,
-    #[error("Try to confirm a filled box")]
-    TryToConfirmFilledBox,
 }
 
 #[derive(Debug, Error)]
@@ -446,21 +444,17 @@ impl App {
 
         let play = self.state.get_play_data()?;
         let pid = play.get_player_id();
-        if !self.get_game_data()?.get_score_table(pid).has_score_in(pos) {
-            let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
-            let score_table = self.get_mut_game_data()?.get_mut_score_table(pid);
-            score_table.confirm_score(pos, scoring(pos, &dice));
-            let next_pid = (pid + 1) % self.get_game_data()?.get_num_players();
-            self.state.cleanup_play_data()?;
+        let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
+        let score_table = self.get_mut_game_data()?.get_mut_score_table(pid);
+        score_table.confirm_score(pos, scoring(pos, &dice))?;
+        let next_pid = (pid + 1) % self.get_game_data()?.get_num_players();
+        self.state.cleanup_play_data()?;
 
-            let next_score_table = self.get_game_data()?.get_score_table(next_pid);
-            if !next_score_table.has_all_scores() {
-                *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
-            } else {
-                self.state = AppState::Result;
-            }
+        let next_score_table = self.get_game_data()?.get_score_table(next_pid);
+        if !next_score_table.has_all_scores() {
+            *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
         } else {
-            bail!(AppStateError::TryToConfirmFilledBox);
+            self.state = AppState::Result;
         }
 
         Ok(())
