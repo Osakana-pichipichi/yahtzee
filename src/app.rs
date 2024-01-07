@@ -4,7 +4,6 @@ use crate::hand::{Hand, HandOpError};
 use crate::play::{Play, PlayPhase};
 use crate::scoring::{scoring, Boxes};
 use anyhow::{anyhow, Result};
-use enum_iterator::{all, first, last, Sequence};
 use std::fmt;
 use thiserror::Error;
 
@@ -346,7 +345,7 @@ impl App {
 
     fn move_cursor_pos_to_table(&mut self) {
         let pid = self.state.get_mut_play_data().unwrap().get_player_id();
-        for pos in all::<Boxes>() {
+        for pos in enum_iterator::all::<Boxes>() {
             if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
                 self.state
                     .set_play_cursor_pos(PlayCursorPos::Table(pos))
@@ -394,8 +393,7 @@ impl App {
     fn up_action_in_score_table(&mut self) {
         if let &PlayCursorPos::Table(init_pos) = self.state.get_play_cursor_pos().unwrap() {
             let mut pos = init_pos;
-            loop {
-                let prev = pos.previous().unwrap_or_else(|| last::<Boxes>().unwrap());
+            while let Some(prev) = enum_iterator::previous_cycle(&pos) {
                 let pid = self.state.get_play_data().unwrap().get_player_id();
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(prev);
                 if !has_score || prev == init_pos {
@@ -414,8 +412,7 @@ impl App {
     fn down_action_in_score_table(&mut self) {
         if let &PlayCursorPos::Table(init_pos) = self.state.get_play_cursor_pos().unwrap() {
             let mut pos = init_pos;
-            loop {
-                let next = pos.next().unwrap_or_else(|| first::<Boxes>().unwrap());
+            while let Some(next) = enum_iterator::next_cycle(&pos) {
                 let pid = self.state.get_play_data().unwrap().get_player_id();
                 let has_score = self.get_game_data().get_score_table(pid).has_score_in(next);
                 if !has_score || next == init_pos {
