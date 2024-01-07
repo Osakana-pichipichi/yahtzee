@@ -49,14 +49,12 @@ where
 
             self.terminal.draw(|f| draw_ui(f, &app))?;
 
-            let result = app.do_action(self.events.next()?);
-
-            if result == AppReturn::Exit {
-                break;
+            match app.do_action(self.events.next()?) {
+                Ok(AppReturn::Exit) => break Ok(()),
+                Err(e) => break Err(e),
+                _ => (),
             }
         }
-
-        Ok(())
     }
 }
 
