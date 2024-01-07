@@ -335,8 +335,12 @@ impl App {
 
             _ => {
                 let pid = self.get_game_data()?.current_player_id();
-                self.state.initialize_play_data(pid)?;
-                *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
+                if !self.get_game_data()?.get_score_table(pid).has_all_scores() {
+                    self.state.initialize_play_data(pid)?;
+                    *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
+                } else {
+                    self.state = AppState::Result;
+                }
                 AppReturn::Continue
             }
         })
@@ -447,15 +451,7 @@ impl App {
         let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
         let score_table = self.get_mut_game_data()?.get_mut_score_table(pid);
         score_table.confirm_score(pos, scoring(pos, &dice))?;
-        let next_pid = (pid + 1) % self.get_game_data()?.get_num_players();
         self.state.cleanup_play_data()?;
-
-        let next_score_table = self.get_game_data()?.get_score_table(next_pid);
-        if !next_score_table.has_all_scores() {
-            *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
-        } else {
-            self.state = AppState::Result;
-        }
 
         Ok(())
     }
