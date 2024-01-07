@@ -99,11 +99,12 @@ impl AppState {
         }
     }
 
-    fn initialize_play_data(&mut self, player_id: usize) -> Result<()> {
+    fn initialize_play_state(&mut self, player_id: usize) -> Result<()> {
         match self {
-            Self::Play(play, ..) => {
+            Self::Play(play, pos) => {
                 if play.is_none() {
                     *play = Some(Play::new(player_id));
+                    *pos = PlayCursorPos::Roll;
                     Ok(())
                 } else {
                     Err(anyhow!(AppStateError::ExistPlayData))
@@ -336,8 +337,7 @@ impl App {
             _ => {
                 let pid = self.get_game_data()?.current_player_id();
                 if !self.get_game_data()?.get_score_table(pid).has_all_scores() {
-                    self.state.initialize_play_data(pid)?;
-                    *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
+                    self.state.initialize_play_state(pid)?;
                 } else {
                     self.state = AppState::Result;
                 }
