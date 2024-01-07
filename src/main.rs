@@ -18,12 +18,24 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{cell::RefCell, io, rc::Rc, time::Duration};
+use std::{cell::RefCell, io, panic, rc::Rc, time::Duration};
 
 pub fn start_ui(app: Rc<RefCell<App>>) -> Result<()> {
+    let panic_hook = panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Err(e) = execute!(io::stdout(), LeaveAlternateScreen) {
+            println!("could not leave the alternate screen: {:?}", e);
+        };
+        if let Err(e) = disable_raw_mode() {
+            println!("could not disable the raw mode: {:?}", e);
+        };
+        panic_hook(info);
+    }));
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
