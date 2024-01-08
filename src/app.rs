@@ -1,5 +1,5 @@
 use crate::events::{Actions, InputEvent};
-use crate::game_data::GameData;
+use crate::game_data::{GameData, GameDataError};
 use crate::hand::{Hand, HandOpError};
 use crate::play::{Play, PlayPhase};
 use crate::scoring::{scoring, Boxes};
@@ -335,11 +335,12 @@ impl App {
             Actions::Exit => AppReturn::Exit,
 
             _ => {
-                let pid = self.get_game_data()?.current_player_id();
-                if !self.get_game_data()?.get_score_table(pid).has_all_scores() {
-                    self.state.initialize_play_state(pid)?;
-                } else {
-                    self.state = AppState::Result;
+                match self.get_game_data()?.current_player_id() {
+                    Ok(pid) => self.state.initialize_play_state(pid)?,
+                    Err(e) => match e.downcast_ref::<GameDataError>() {
+                        Some(GameDataError::FinishedGame) => self.state = AppState::Result,
+                        _ => return Err(e),
+                    },
                 }
                 AppReturn::Continue
             }

@@ -1,4 +1,12 @@
 use crate::score_table::ScoreTable;
+use anyhow::{bail, Result};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum GameDataError {
+    #[error("The game is finished")]
+    FinishedGame,
+}
 
 pub struct GameData {
     num_players: usize,
@@ -39,14 +47,18 @@ impl GameData {
         self.num_players
     }
 
-    pub fn current_player_id(&self) -> usize {
+    pub fn current_player_id(&self) -> Result<usize> {
+        if self.scores.iter().all(|st| st.has_all_scores()) {
+            bail!(GameDataError::FinishedGame);
+        }
+
         let pid_to_filled_scores: Vec<_> = self
             .scores
             .iter()
             .map(|e| e.get_num_filled_scores())
             .collect();
-        (1..self.get_num_players())
+        Ok((1..self.get_num_players())
             .find(|&i| pid_to_filled_scores[i - 1] > pid_to_filled_scores[i])
-            .unwrap_or(0)
+            .unwrap_or(0))
     }
 }
