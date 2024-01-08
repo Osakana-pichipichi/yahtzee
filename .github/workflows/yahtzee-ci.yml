@@ -39,3 +39,16 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run tests
         run: cargo test --verbose
+
+  check-push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.before }}
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check commits after previous push
+        run: ./tools/checker.sh all ${{ github.event.before }}..${{ github.ref_name }}
