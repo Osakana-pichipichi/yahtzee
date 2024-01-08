@@ -98,6 +98,10 @@ fn sixes(dice: &[u32]) -> u32 {
 
 fn n_of_a_kind(dice: &[u32], n: u32) -> u32 {
     let n: usize = n as usize;
+    if dice.len() < n {
+        return 0;
+    }
+
     for d in dice[0..=(Hand::DICE_NUM - n)].iter() {
         if dice.iter().filter(|&x| x == d).count() >= n {
             return dice.iter().sum();
@@ -116,6 +120,10 @@ fn four_of_a_kind(dice: &[u32]) -> u32 {
 }
 
 fn full_house(dice: &[u32]) -> u32 {
+    if dice.len() != Hand::DICE_NUM {
+        return 0;
+    }
+
     let mut sorted_dice: Vec<u32> = dice.to_vec();
     sorted_dice.sort_unstable();
     let init = sorted_dice[0];
@@ -149,11 +157,13 @@ fn small_straight(dice: &[u32]) -> u32 {
 }
 
 fn large_straight(dice: &[u32]) -> u32 {
+    if dice.len() != Hand::DICE_NUM {
+        return 0;
+    }
+
     let mut sorted_dice: Vec<u32> = dice.to_vec();
     sorted_dice.sort_unstable();
-    let init = sorted_dice[0];
-
-    if sorted_dice == array![i => init + (i as u32); 5] {
+    if sorted_dice == array![i => sorted_dice[0] + (i as u32); 5] {
         LARGE_STRAIGHT_SCORE
     } else {
         0
@@ -161,7 +171,9 @@ fn large_straight(dice: &[u32]) -> u32 {
 }
 
 fn yahtzee(dice: &[u32]) -> u32 {
-    if dice == [dice[0]; Hand::DICE_NUM] {
+    if dice.len() != Hand::DICE_NUM {
+        0
+    } else if dice == [dice[0]; Hand::DICE_NUM] {
         YAHTZEE_SCORE
     } else {
         0
@@ -184,6 +196,12 @@ mod tests {
     fn upper_section_scoring_test() {
         let dice: [u32; 5] = [1, 3, 3, 3, 6];
         assert_eq!(scoring(Boxes::Threes, &dice), 9);
+
+        let dice: [u32; 3] = [1, 3, 3];
+        assert_eq!(scoring(Boxes::Threes, &dice), 6);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::Threes, &dice), 0);
     }
 
     #[test]
@@ -195,6 +213,12 @@ mod tests {
         assert_eq!(scoring(Boxes::ThreeOfaAKind, &dice), 13);
 
         let dice: [u32; 5] = [1, 2, 3, 3, 6];
+        assert_eq!(scoring(Boxes::ThreeOfaAKind, &dice), 0);
+
+        let dice: [u32; 4] = [1, 3, 3, 3];
+        assert_eq!(scoring(Boxes::ThreeOfaAKind, &dice), 10);
+
+        let dice: [u32; 0] = [];
         assert_eq!(scoring(Boxes::ThreeOfaAKind, &dice), 0);
     }
 
@@ -208,6 +232,12 @@ mod tests {
 
         let dice: [u32; 5] = [1, 2, 3, 3, 6];
         assert_eq!(scoring(Boxes::FourOfaAKind, &dice), 0);
+
+        let dice: [u32; 4] = [3, 3, 3, 3];
+        assert_eq!(scoring(Boxes::FourOfaAKind, &dice), 12);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::FourOfaAKind, &dice), 0);
     }
 
     #[test]
@@ -220,6 +250,12 @@ mod tests {
 
         let dice: [u32; 5] = [4, 5, 1, 4, 5];
         assert_eq!(scoring(Boxes::FullHouse, &dice), 0);
+
+        let dice: [u32; 4] = [4, 5, 1, 4];
+        assert_eq!(scoring(Boxes::FullHouse, &dice), 0);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::FullHouse, &dice), 0);
     }
 
     #[test]
@@ -228,6 +264,15 @@ mod tests {
         assert_eq!(scoring(Boxes::SmallStraight, &dice), SMALL_STRAIGHT_SCORE);
 
         let dice: [u32; 5] = [2, 4, 4, 6, 4];
+        assert_eq!(scoring(Boxes::SmallStraight, &dice), 0);
+
+        let dice: [u32; 4] = [5, 3, 4, 2];
+        assert_eq!(scoring(Boxes::SmallStraight, &dice), SMALL_STRAIGHT_SCORE);
+
+        let dice: [u32; 3] = [5, 3, 4];
+        assert_eq!(scoring(Boxes::SmallStraight, &dice), 0);
+
+        let dice: [u32; 0] = [];
         assert_eq!(scoring(Boxes::SmallStraight, &dice), 0);
     }
 
@@ -238,6 +283,12 @@ mod tests {
 
         let dice: [u32; 5] = [2, 3, 4, 1, 4];
         assert_eq!(scoring(Boxes::LargeStraight, &dice), 0);
+
+        let dice: [u32; 4] = [2, 3, 4, 1];
+        assert_eq!(scoring(Boxes::LargeStraight, &dice), 0);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::LargeStraight, &dice), 0);
     }
 
     #[test]
@@ -247,11 +298,32 @@ mod tests {
 
         let dice: [u32; 5] = [2, 3, 5, 1, 4];
         assert_eq!(scoring(Boxes::Yahtzee, &dice), 0);
+
+        let dice: [u32; 4] = [2, 3, 5, 1];
+        assert_eq!(scoring(Boxes::Yahtzee, &dice), 0);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::Yahtzee, &dice), 0);
     }
 
     #[test]
     fn chance_test() {
         let dice: [u32; 5] = [1, 3, 5, 2, 6];
         assert_eq!(scoring(Boxes::Chance, &dice), 17);
+
+        let dice: [u32; 4] = [1, 3, 5, 2];
+        assert_eq!(scoring(Boxes::Chance, &dice), 11);
+
+        let dice: [u32; 3] = [1, 3, 5];
+        assert_eq!(scoring(Boxes::Chance, &dice), 9);
+
+        let dice: [u32; 2] = [1, 3];
+        assert_eq!(scoring(Boxes::Chance, &dice), 4);
+
+        let dice: [u32; 1] = [1];
+        assert_eq!(scoring(Boxes::Chance, &dice), 1);
+
+        let dice: [u32; 0] = [];
+        assert_eq!(scoring(Boxes::Chance, &dice), 0);
     }
 }

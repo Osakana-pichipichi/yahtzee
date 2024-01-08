@@ -1,6 +1,14 @@
-use crate::hand::Hand;
+use crate::hand::{Die, Hand};
 use crate::scoring::Boxes;
+use anyhow::{bail, Result};
 use std::collections::HashMap;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum RecordError {
+    #[error("Try to fill the filled record")]
+    TryToFillFilledRecord,
+}
 
 #[derive(Clone)]
 struct Record {
@@ -16,12 +24,14 @@ impl Record {
         Record { score: Some(score) }
     }
 
-    fn fill(&mut self, score: u32) {
-        if !self.is_filled() {
-            self.score = Some(score);
-        } else {
-            panic!("The record to be filled is already filled.");
+    fn fill(&mut self, score: u32) -> Result<()> {
+        if self.is_filled() {
+            bail!(RecordError::TryToFillFilledRecord);
         }
+
+        self.score = Some(score);
+
+        Ok(())
     }
 
     fn get_score(&self) -> &Option<u32> {
@@ -58,7 +68,7 @@ impl ScoreTable {
         /* This means (1 + 2 + 3 + 4 + 5 + 6) * 3. */
         let mut sum = 0;
         let mut i = 1;
-        while i <= Hand::PIPS.len() {
+        while i <= Die::PIPS.len() {
             sum += i;
             i += 1;
         }
@@ -81,10 +91,7 @@ impl ScoreTable {
     }
 
     pub fn has_all_scores(&self) -> bool {
-        self.table
-            .iter()
-            .map(|(.., row)| row.is_filled())
-            .all(|x| x)
+        self.table.iter().all(|(.., row)| row.is_filled())
     }
 
     pub fn get_num_filled_scores(&self) -> usize {
@@ -94,14 +101,8 @@ impl ScoreTable {
             .count()
     }
 
-    pub fn confirm_score(&mut self, b: Boxes, score: u32) {
-        self.table.get_mut(&b).unwrap().fill(score);
-    }
-
-    pub fn remaining_boxes(&self) -> Vec<Boxes> {
-        enum_iterator::all::<Boxes>()
-            .filter(|&b| self.has_score_in(b))
-            .collect()
+    pub fn confirm_score(&mut self, b: Boxes, score: u32) -> Result<()> {
+        self.table.get_mut(&b).unwrap().fill(score)
     }
 
     pub fn get_total_upper_score(&self) -> u32 {
@@ -196,7 +197,7 @@ mod tests {
         assert!(!record.is_filled());
 
         let score: u32 = 32;
-        record.fill(score);
+        record.fill(score).unwrap();
         assert_eq!(record.get_score(), &Some(score));
         assert!(record.is_filled());
     }
@@ -209,7 +210,7 @@ mod tests {
 
         assert!(!score_table.has_score_in(b));
 
-        score_table.confirm_score(b, score);
+        score_table.confirm_score(b, score).unwrap();
         assert!(score_table.has_score_in(b));
         assert_eq!(score_table.get_score(b), &Some(score));
     }
@@ -218,7 +219,7 @@ mod tests {
     fn test_get_total_upper_score() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
@@ -228,32 +229,32 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3
+            Die::PIPS[1..].iter().sum::<u32>() * 3
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_upper_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 2
+            Die::PIPS[1..].iter().sum::<u32>() * 2
         );
     }
 
@@ -261,7 +262,7 @@ mod tests {
     fn test_get_total_upper_score_if_filled_by() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
@@ -271,27 +272,27 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(Boxes::Chance, 20),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         let (b, p) = ScoreTable::BONUS_TARGETS[0];
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(b, p * 3),
-            Hand::PIPS.iter().sum::<u32>() * 3
+            Die::PIPS.iter().sum::<u32>() * 3
         );
         assert_eq!(
             score_table.get_total_upper_score_if_filled_by(b, p * 2),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3 + 2
+            Die::PIPS[1..].iter().sum::<u32>() * 3 + 2
         );
     }
 
@@ -299,28 +300,28 @@ mod tests {
     fn test_calculate_bonus() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(score_table.calculate_bonus(), Some(ScoreTable::BONUS_POINT));
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(score_table.calculate_bonus(), Some(0));
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(score_table.calculate_bonus(), None);
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(score_table.calculate_bonus(), Some(0));
@@ -330,7 +331,7 @@ mod tests {
     fn test_calculate_bonus_if_filled_by() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         let result = score_table.calculate_bonus_if_filled_by(Boxes::Chance, 20);
@@ -338,7 +339,7 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         let result = score_table.calculate_bonus_if_filled_by(Boxes::Chance, 20);
@@ -346,7 +347,7 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         let (b, p) = ScoreTable::BONUS_TARGETS[0];
@@ -360,7 +361,7 @@ mod tests {
     fn test_get_total_score() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
@@ -370,32 +371,32 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS.iter().sum::<u32>() * 2
+            Die::PIPS.iter().sum::<u32>() * 2
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3
+            Die::PIPS[1..].iter().sum::<u32>() * 3
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_score(),
-            Hand::PIPS[1..].iter().sum::<u32>() * 2
+            Die::PIPS[1..].iter().sum::<u32>() * 2
         );
     }
 
@@ -403,7 +404,7 @@ mod tests {
     fn test_get_total_score_if_filled_by() {
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         assert_eq!(
@@ -413,27 +414,27 @@ mod tests {
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS.iter() {
-            score_table.confirm_score(b, p * 2);
+            score_table.confirm_score(b, p * 2).unwrap();
         }
 
         assert_eq!(
             score_table.get_total_score_if_filled_by(Boxes::Chance, 20),
-            Hand::PIPS.iter().sum::<u32>() * 2 + 20
+            Die::PIPS.iter().sum::<u32>() * 2 + 20
         );
 
         let mut score_table = ScoreTable::new();
         for &(b, p) in ScoreTable::BONUS_TARGETS[1..].iter() {
-            score_table.confirm_score(b, p * 3);
+            score_table.confirm_score(b, p * 3).unwrap();
         }
 
         let (b, p) = ScoreTable::BONUS_TARGETS[0];
         assert_eq!(
             score_table.get_total_score_if_filled_by(b, p * 3),
-            Hand::PIPS.iter().sum::<u32>() * 3 + ScoreTable::BONUS_POINT
+            Die::PIPS.iter().sum::<u32>() * 3 + ScoreTable::BONUS_POINT
         );
         assert_eq!(
             score_table.get_total_score_if_filled_by(b, p * 2),
-            Hand::PIPS[1..].iter().sum::<u32>() * 3 + 2
+            Die::PIPS[1..].iter().sum::<u32>() * 3 + 2
         );
     }
 }

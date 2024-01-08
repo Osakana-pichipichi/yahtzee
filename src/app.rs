@@ -1,10 +1,10 @@
 use crate::events::{Actions, InputEvent};
-use crate::hand::Hand;
-use crate::score_table::ScoreTable;
+use crate::game_data::{GameData, GameDataError};
+use crate::hand::{Hand, HandOpError};
+use crate::play::{Play, PlayPhase};
 use crate::scoring::{scoring, Boxes};
-use anyhow::{anyhow, Result};
-use array_macro::array;
-use enum_iterator::{all, first, last, Sequence};
+use anyhow::{anyhow, bail, Result};
+use std::fmt;
 use thiserror::Error;
 
 #[derive(PartialEq, Eq)]
@@ -13,59 +13,130 @@ pub enum AppReturn {
     Continue,
 }
 
+#[derive(Debug, Error)]
+pub enum PlayCursorPosError {
+    #[error("PlayCursorPos is not in a table")]
+    NotInTable,
+}
+
 #[derive(PartialEq, Eq)]
-pub enum CursorPos {
-    Role,
+pub enum PlayCursorPos {
+    Roll,
     Hand(usize),
     Dust(usize),
     Table(Boxes),
     Disappear,
 }
 
-pub enum GamePhase {
-    Roll(usize),
-    SelectOrReroll(usize),
-    Select,
+#[derive(PartialEq, Eq)]
+pub enum StartMenuSelection {
+    Play,
+    Exit,
 }
 
-pub struct Play {
-    pub player_id: usize,
-    pub hand: Hand,
-    pub is_held: [bool; Hand::DICE_NUM],
-    pub game_phase: GamePhase,
-}
-
-impl Play {
-    pub fn new(player_id: usize) -> Self {
-        Self {
-            player_id,
-            hand: Hand::new_with_random_n_dice(Hand::DICE_NUM),
-            is_held: [false; 5],
-            game_phase: GamePhase::Roll(0),
+impl fmt::Display for StartMenuSelection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StartMenuSelection::Play => f.pad("Play"),
+            StartMenuSelection::Exit => f.pad("Exit"),
         }
     }
+}
 
-    pub fn reroll_dice(&mut self) -> usize {
-        let removes = self
-            .is_held
-            .iter()
-            .map(|&is_heled| !is_heled)
-            .collect::<Vec<_>>();
-        self.hand.remove_dice(&removes);
+pub const LOWEST_PLAYER_ID: usize = 1;
+pub const HIGHEST_PLAYER_ID: usize = 4;
 
-        let reroll_dices = removes.iter().filter(|&&e| e).count();
-        let rests = Hand::DICE_NUM - reroll_dices;
-        self.is_held = array![i => i < rests; Hand::DICE_NUM];
-        self.hand
-            .add_dice(&Hand::new_with_random_n_dice(reroll_dices));
+#[derive(PartialEq, Eq)]
+pub enum NumPlayersSelection {
+    NumPlayers(usize),
+    Back,
+}
 
-        reroll_dices
+impl fmt::Display for NumPlayersSelection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NumPlayersSelection::NumPlayers(n) => f.pad(&format!("{} Players", n)),
+            NumPlayersSelection::Back => f.pad("Back"),
+        }
     }
 }
 
 pub enum AppState {
-    Play(Option<Play>),
+    StartMenu(StartMenuSelection),
+    SelectNumPlayers(NumPlayersSelection),
+    Play(Option<Play>, PlayCursorPos),
     Result,
+}
+
+impl AppState {
+    fn initialized_start_menu_state() -> Self {
+        Self::StartMenu(StartMenuSelection::Play)
+    }
+
+    fn initialized_select_num_players_state() -> Self {
+        Self::SelectNumPlayers(NumPlayersSelection::NumPlayers(LOWEST_PLAYER_ID))
+    }
+
+    fn initialized_play_state() -> Self {
+        Self::Play(None, PlayCursorPos::Disappear)
+    }
+
+    pub fn get_play_data(&self) -> Result<&Play> {
+        match self {
+            Self::Play(play, ..) => play
+                .as_ref()
+                .ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    fn get_mut_play_data(&mut self) -> Result<&mut Play> {
+        match self {
+            Self::Play(play, ..) => play
+                .as_mut()
+                .ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    fn initialize_play_state(&mut self, player_id: usize) -> Result<()> {
+        match self {
+            Self::Play(play, pos) => {
+                if play.is_none() {
+                    *play = Some(Play::new(player_id));
+                    *pos = PlayCursorPos::Roll;
+                    Ok(())
+                } else {
+                    Err(anyhow!(AppStateError::ExistPlayData))
+                }
+            }
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    fn cleanup_play_data(&mut self) -> Result<()> {
+        match self {
+            Self::Play(..) => {
+                *self = Self::initialized_play_state();
+                Ok(())
+            }
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    pub fn get_play_cursor_pos(&self) -> Result<&PlayCursorPos> {
+        match self {
+            AppState::Play(.., pos) => Ok(pos),
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
+
+    fn get_mut_play_cursor_pos(&mut self) -> Result<&mut PlayCursorPos> {
+        match self {
+            AppState::Play(.., pos) => Ok(pos),
+            _ => Err(anyhow!(AppStateError::UnexpectedState)),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -78,282 +149,336 @@ pub enum AppStateError {
     ExistPlayData,
 }
 
-pub struct GameData {
-    num_players: usize,
-    scores: Vec<ScoreTable>,
-}
-
-impl GameData {
-    pub fn new(num_players: usize) -> Self {
-        Self {
-            num_players,
-            scores: (0..num_players).map(|_| ScoreTable::new()).collect(),
-        }
-    }
-
-    pub fn get_score_table(&self, player_id: usize) -> &ScoreTable {
-        if player_id >= self.num_players {
-            panic!(
-                "Unexpected player_id: {} (total players: {})",
-                player_id, self.num_players
-            );
-        };
-
-        &self.scores[player_id]
-    }
-
-    pub fn get_mut_score_table(&mut self, player_id: usize) -> &mut ScoreTable {
-        if player_id >= self.num_players {
-            panic!(
-                "Unexpected player_id: {} (total players: {})",
-                player_id, self.num_players
-            );
-        };
-
-        &mut self.scores[player_id]
-    }
-
-    pub fn get_num_players(&self) -> usize {
-        self.num_players
-    }
-
-    pub fn current_player_id(&self) -> usize {
-        let pid_to_filled_scores = self
-            .scores
-            .iter()
-            .map(|e| e.get_num_filled_scores())
-            .collect::<Vec<_>>();
-        (1..self.get_num_players())
-            .find(|&i| pid_to_filled_scores[i - 1] > pid_to_filled_scores[i])
-            .unwrap_or(0)
-    }
+#[derive(Debug, Error)]
+pub enum AppError {
+    #[error("Game data does not exist")]
+    NoGameData,
 }
 
 pub struct App {
-    pub state: AppState,
-    pub cursor_pos: CursorPos,
+    state: AppState,
     game_data: Option<GameData>,
 }
 
-impl App {
-    const MAX_ROLL_COUNT: usize = 3;
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    pub fn new(num_players: usize) -> Self {
+impl App {
+    pub fn new() -> Self {
         Self {
-            state: AppState::Play(None),
-            cursor_pos: CursorPos::Role,
-            game_data: Some(GameData::new(num_players)),
+            state: AppState::StartMenu(StartMenuSelection::Play),
+            game_data: None,
         }
     }
 
     /* helper functions */
-    pub fn get_game_data(&self) -> &GameData {
-        self.game_data.as_ref().unwrap()
+    pub fn get_state(&self) -> &AppState {
+        &self.state
     }
 
-    fn get_mut_game_data(&mut self) -> &mut GameData {
-        self.game_data.as_mut().unwrap()
+    pub fn get_game_data(&self) -> Result<&GameData> {
+        self.game_data
+            .as_ref()
+            .ok_or_else(|| anyhow!(AppError::NoGameData))
     }
 
-    pub fn get_play_data(&self) -> Result<&Play> {
-        match &self.state {
-            AppState::Play(p) => p.as_ref().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
-            _ => Err(anyhow!(AppStateError::UnexpectedState)),
-        }
-    }
-
-    fn get_mut_play_data(&mut self) -> Result<&mut Play> {
-        match &mut self.state {
-            AppState::Play(p) => p.as_mut().ok_or_else(|| anyhow!(AppStateError::NoPlayData)),
-            _ => Err(anyhow!(AppStateError::UnexpectedState)),
-        }
-    }
-
-    fn initialize_play_data(&mut self, player_id: usize) -> Result<&Play> {
-        match &self.state {
-            AppState::Play(p) => {
-                if p.is_none() {
-                    self.state = AppState::Play(Some(Play::new(player_id)));
-                    self.get_play_data()
-                } else {
-                    Err(anyhow!(AppStateError::ExistPlayData))
-                }
-            }
-            _ => Err(anyhow!(AppStateError::UnexpectedState)),
-        }
-    }
-
-    fn cleanup_play_data(&mut self) -> Result<()> {
-        match &self.state {
-            AppState::Play(..) => {
-                self.state = AppState::Play(None);
-                Ok(())
-            }
-            _ => Err(anyhow!(AppStateError::UnexpectedState)),
-        }
+    fn get_mut_game_data(&mut self) -> Result<&mut GameData> {
+        self.game_data
+            .as_mut()
+            .ok_or_else(|| anyhow!(AppError::NoGameData))
     }
 
     /* action handlers */
-    pub fn do_action(&mut self, input_event: InputEvent) -> AppReturn {
-        match self.state {
-            AppState::Play(..) => self.do_action_in_play(input_event),
-            AppState::Result => self.do_action_in_result(input_event),
-        }
+    pub fn do_action(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match self.state {
+            AppState::StartMenu(..) => self.do_action_in_start_menu(input_event)?,
+            AppState::SelectNumPlayers(..) => self.do_action_in_select_num_players(input_event)?,
+            AppState::Play(..) => self.do_action_in_play(input_event)?,
+            AppState::Result => self.do_action_in_result(input_event)?,
+        })
     }
 
-    fn do_action_in_play(&mut self, input_event: InputEvent) -> AppReturn {
-        match self.get_play_data() {
-            Ok(play) => match play.game_phase {
-                GamePhase::Roll(..) => self.do_action_in_roll(input_event),
-                GamePhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event),
-                GamePhase::Select => self.do_action_in_select(input_event),
-            },
-            Err(e) => match e.downcast_ref::<AppStateError>().unwrap() {
-                AppStateError::NoPlayData => self.do_action_in_init(input_event),
-                _ => panic!("{}", e),
-            },
-        }
-    }
-
-    fn do_action_in_init(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event.action() {
+    fn do_action_in_start_menu(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                let pid = self.get_game_data().current_player_id();
-                self.initialize_play_data(pid).unwrap();
+                let AppState::StartMenu(pos) = &self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        self.state = AppState::initialized_select_num_players_state();
+                        AppReturn::Continue
+                    }
+                    StartMenuSelection::Exit => AppReturn::Exit,
+                }
+            }
+
+            Actions::Up => {
+                let AppState::StartMenu(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        *pos = StartMenuSelection::Exit;
+                    }
+                    StartMenuSelection::Exit => {
+                        *pos = StartMenuSelection::Play;
+                    }
+                }
+                AppReturn::Continue
+            }
+
+            Actions::Down => {
+                let AppState::StartMenu(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                match pos {
+                    StartMenuSelection::Play => {
+                        *pos = StartMenuSelection::Exit;
+                    }
+                    StartMenuSelection::Exit => {
+                        *pos = StartMenuSelection::Play;
+                    }
+                }
                 AppReturn::Continue
             }
 
             _ => AppReturn::Continue,
-        }
+        })
     }
 
-    fn move_cursor_pos_to_table(&mut self) {
-        let pid = self.get_mut_play_data().unwrap().player_id;
-        for pos in all::<Boxes>() {
-            if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
-                self.cursor_pos = CursorPos::Table(pos);
-                break;
-            }
-        }
-    }
-
-    fn do_action_in_roll(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event.action() {
+    fn do_action_in_select_num_players(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                let play = self.get_mut_play_data().unwrap();
-                let count = if let GamePhase::Roll(count) = play.game_phase {
-                    count + 1
-                } else {
-                    panic!("Unexpected status!")
+                let AppState::SelectNumPlayers(pos) = &self.state else {
+                    panic!("Unexpected state")
                 };
+                match pos {
+                    &NumPlayersSelection::NumPlayers(num_players) => {
+                        self.state = AppState::initialized_play_state();
+                        self.game_data = Some(GameData::new(num_players));
+                    }
+                    NumPlayersSelection::Back => {
+                        self.state = AppState::initialized_start_menu_state();
+                    }
+                }
+                AppReturn::Continue
+            }
 
-                play.is_held = [true; Hand::DICE_NUM];
-                if count < App::MAX_ROLL_COUNT {
-                    play.game_phase = GamePhase::SelectOrReroll(count);
-                    self.cursor_pos = CursorPos::Hand(0);
-                } else {
-                    play.game_phase = GamePhase::Select;
-                    self.move_cursor_pos_to_table();
+            Actions::Up => {
+                let AppState::SelectNumPlayers(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                *pos = match pos {
+                    &mut NumPlayersSelection::NumPlayers(num_players) => {
+                        if num_players == LOWEST_PLAYER_ID {
+                            NumPlayersSelection::Back
+                        } else if LOWEST_PLAYER_ID < num_players && num_players <= HIGHEST_PLAYER_ID
+                        {
+                            NumPlayersSelection::NumPlayers(num_players - 1)
+                        } else {
+                            panic!("Unexpected NumPlayers value");
+                        }
+                    }
+                    NumPlayersSelection::Back => NumPlayersSelection::NumPlayers(HIGHEST_PLAYER_ID),
+                };
+                AppReturn::Continue
+            }
+
+            Actions::Down => {
+                let AppState::SelectNumPlayers(pos) = &mut self.state else {
+                    panic!("Unexpected state")
+                };
+                *pos = match pos {
+                    &mut NumPlayersSelection::NumPlayers(num_players) => {
+                        if (LOWEST_PLAYER_ID..HIGHEST_PLAYER_ID).contains(&num_players) {
+                            NumPlayersSelection::NumPlayers(num_players + 1)
+                        } else if num_players == HIGHEST_PLAYER_ID {
+                            NumPlayersSelection::Back
+                        } else {
+                            panic!("Unexpected NumPlayers value");
+                        }
+                    }
+                    NumPlayersSelection::Back => NumPlayersSelection::NumPlayers(LOWEST_PLAYER_ID),
+                };
+                AppReturn::Continue
+            }
+
+            _ => AppReturn::Continue,
+        })
+    }
+
+    fn do_action_in_play(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match self.state.get_play_data() {
+            Ok(play) => match play.get_phase() {
+                PlayPhase::Init => self.do_action_in_init(input_event)?,
+                PlayPhase::Roll(..) => self.do_action_in_roll(input_event)?,
+                PlayPhase::SelectOrReroll(..) => self.do_action_in_select_or_reroll(input_event)?,
+                PlayPhase::Select => self.do_action_in_select(input_event)?,
+            },
+            Err(e) => match e.downcast_ref::<AppStateError>() {
+                Some(AppStateError::NoPlayData) => self.do_action_in_no_play_data(input_event)?,
+                _ => return Err(e),
+            },
+        })
+    }
+
+    fn do_action_in_no_play_data(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            _ => {
+                match self.get_game_data()?.current_player_id() {
+                    Ok(pid) => self.state.initialize_play_state(pid)?,
+                    Err(e) => match e.downcast_ref::<GameDataError>() {
+                        Some(GameDataError::FinishedGame) => self.state = AppState::Result,
+                        _ => return Err(e),
+                    },
+                }
+                AppReturn::Continue
+            }
+        })
+    }
+
+    fn do_action_in_init(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            Actions::Select => {
+                let play = self.state.get_mut_play_data()?;
+                play.progress()?;
+                AppReturn::Continue
+            }
+
+            _ => AppReturn::Continue,
+        })
+    }
+
+    fn move_cursor_pos_to_table(&mut self) -> Result<()> {
+        let pid = self.state.get_mut_play_data()?.get_player_id();
+        for pos in enum_iterator::all::<Boxes>() {
+            if !self.get_game_data()?.get_score_table(pid).has_score_in(pos) {
+                *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Table(pos);
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn do_action_in_roll(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
+            Actions::Exit => AppReturn::Exit,
+
+            Actions::Select => {
+                let play = self.state.get_mut_play_data()?;
+
+                play.progress()?;
+                match play.get_phase() {
+                    PlayPhase::SelectOrReroll(..) => {
+                        *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Hand(0);
+                    }
+                    PlayPhase::Select => {
+                        self.move_cursor_pos_to_table()?;
+                    }
+                    _ => panic!("Unexpected PlayPhase"),
                 }
 
                 AppReturn::Continue
             }
 
             _ => {
-                self.get_mut_play_data().unwrap().reroll_dice();
+                self.state
+                    .get_mut_play_data()?
+                    .get_mut_hand()
+                    .reroll_dice()?;
                 AppReturn::Continue
             }
-        }
+        })
     }
 
-    fn up_action_in_score_table(&mut self) {
-        if let CursorPos::Table(init_pos) = self.cursor_pos {
-            let mut pos = init_pos;
-            loop {
-                let prev = pos.previous().unwrap_or_else(|| last::<Boxes>().unwrap());
-                let pid = self.get_play_data().unwrap().player_id;
-                let has_score = self.get_game_data().get_score_table(pid).has_score_in(prev);
-                if !has_score || prev == init_pos {
-                    self.cursor_pos = CursorPos::Table(prev);
-                    break;
-                }
-                pos = prev;
+    fn up_action_in_score_table(&mut self) -> Result<()> {
+        let &PlayCursorPos::Table(pos) = self.state.get_play_cursor_pos()? else {
+            bail!(PlayCursorPosError::NotInTable);
+        };
+
+        let mut p = pos;
+        let pid = self.state.get_play_data()?.get_player_id();
+        let score_table = self.get_game_data()?.get_score_table(pid);
+        while let Some(prev) = enum_iterator::previous_cycle(&p) {
+            if !score_table.has_score_in(prev) || prev == pos {
+                *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Table(prev);
+                break;
             }
-        } else {
-            panic!("Unexpected curson position");
+            p = prev;
         }
+
+        Ok(())
     }
 
-    fn down_action_in_score_table(&mut self) {
-        if let CursorPos::Table(init_pos) = self.cursor_pos {
-            let mut pos = init_pos;
-            loop {
-                let next = pos.next().unwrap_or_else(|| first::<Boxes>().unwrap());
-                let pid = self.get_play_data().unwrap().player_id;
-                let has_score = self.get_game_data().get_score_table(pid).has_score_in(next);
-                if !has_score || next == init_pos {
-                    self.cursor_pos = CursorPos::Table(next);
-                    break;
-                }
-                pos = next;
+    fn down_action_in_score_table(&mut self) -> Result<()> {
+        let &PlayCursorPos::Table(pos) = self.state.get_play_cursor_pos()? else {
+            bail!(PlayCursorPosError::NotInTable);
+        };
+
+        let mut p = pos;
+        let pid = self.state.get_play_data()?.get_player_id();
+        let score_table = self.get_game_data()?.get_score_table(pid);
+        while let Some(next) = enum_iterator::next_cycle(&p) {
+            if !score_table.has_score_in(next) || next == pos {
+                *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Table(next);
+                break;
             }
-        } else {
-            panic!("Unexpected curson position");
+            p = next;
         }
+
+        Ok(())
     }
 
-    fn confirm_score_action(&mut self) {
-        if let CursorPos::Table(pos) = self.cursor_pos {
-            let play = self.get_play_data().unwrap();
-            let pid = play.player_id;
-            if !self.get_game_data().get_score_table(pid).has_score_in(pos) {
-                let dice = play.hand.get_dice().to_vec();
-                let score_table = self.get_mut_game_data().get_mut_score_table(pid);
-                score_table.confirm_score(pos, scoring(pos, &dice));
-                let next_pid = (pid + 1) % self.get_game_data().get_num_players();
-                self.cleanup_play_data().unwrap();
+    fn confirm_score_action(&mut self) -> Result<()> {
+        let &PlayCursorPos::Table(pos) = self.state.get_play_cursor_pos()? else {
+            bail!(PlayCursorPosError::NotInTable);
+        };
 
-                let next_score_table = self.get_game_data().get_score_table(next_pid);
-                if !next_score_table.has_all_scores() {
-                    self.cursor_pos = CursorPos::Role;
-                } else {
-                    self.state = AppState::Result;
-                    self.cursor_pos = CursorPos::Disappear;
-                }
-            }
-        } else {
-            panic!("Unexpected curson position");
-        }
+        let play = self.state.get_play_data()?;
+        let pid = play.get_player_id();
+        let dice = HandOpError::unwrap_pips(play.get_hand().get_pips());
+        let score_table = self.get_mut_game_data()?.get_mut_score_table(pid);
+        score_table.confirm_score(pos, scoring(pos, &dice))?;
+        self.state.cleanup_play_data()?;
+
+        Ok(())
     }
 
-    fn do_action_in_select_or_reroll(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event.action() {
+    fn do_action_in_select_or_reroll(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
-                        let play = self.get_mut_play_data().unwrap();
-                        if !play.is_held.iter().all(|&x| x) {
-                            play.reroll_dice();
-                            play.game_phase =
-                                if let GamePhase::SelectOrReroll(count) = play.game_phase {
-                                    GamePhase::Roll(count)
-                                } else {
-                                    panic!("Unexpected status!")
-                                };
+                match self.state.get_play_cursor_pos()? {
+                    PlayCursorPos::Roll => {
+                        let play = self.state.get_mut_play_data()?;
+                        match play.progress() {
+                            Ok(..) => (),
+                            Err(e) => match e.downcast_ref::<HandOpError>() {
+                                Some(HandOpError::NoDiceToRoll) => (),
+                                _ => return Err(e),
+                            },
                         }
                     }
-                    CursorPos::Hand(pos) | CursorPos::Dust(pos) => {
-                        let play = self.get_mut_play_data().unwrap();
-                        play.is_held[pos] = !play.is_held[pos]
+                    &PlayCursorPos::Hand(pos) | &PlayCursorPos::Dust(pos) => {
+                        let hand = self.state.get_mut_play_data()?.get_mut_hand();
+                        hand.hold(pos, !hand.is_held(pos)?)?;
                     }
-                    CursorPos::Table(..) => {
-                        self.confirm_score_action();
+                    PlayCursorPos::Table(..) => {
+                        self.confirm_score_action()?;
                     }
                     _ => (),
                 }
@@ -361,19 +486,15 @@ impl App {
             }
 
             Actions::Left => {
-                match self.cursor_pos {
-                    CursorPos::Hand(pos) => {
-                        if pos > 0 {
-                            self.cursor_pos = CursorPos::Hand(pos - 1);
+                let cursor_pos = self.state.get_mut_play_cursor_pos()?;
+                match cursor_pos {
+                    PlayCursorPos::Hand(pos) | PlayCursorPos::Dust(pos) => {
+                        if *pos > 0 {
+                            *pos -= 1;
                         }
                     }
-                    CursorPos::Dust(pos) => {
-                        if pos > 0 {
-                            self.cursor_pos = CursorPos::Dust(pos - 1);
-                        }
-                    }
-                    CursorPos::Table(..) => {
-                        self.cursor_pos = CursorPos::Hand(Hand::DICE_NUM - 1);
+                    PlayCursorPos::Table(..) => {
+                        *cursor_pos = PlayCursorPos::Hand(Hand::DICE_NUM - 1);
                     }
                     _ => (),
                 }
@@ -381,24 +502,17 @@ impl App {
             }
 
             Actions::Right => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
-                        self.move_cursor_pos_to_table();
+                let cursor_pos = self.state.get_mut_play_cursor_pos()?;
+                match cursor_pos {
+                    PlayCursorPos::Roll => {
+                        self.move_cursor_pos_to_table()?;
                     }
-                    CursorPos::Hand(pos) => {
-                        let new_pos = pos + 1;
+                    PlayCursorPos::Hand(pos) | PlayCursorPos::Dust(pos) => {
+                        let new_pos = *pos + 1;
                         if new_pos < Hand::DICE_NUM {
-                            self.cursor_pos = CursorPos::Hand(new_pos);
+                            *pos = new_pos;
                         } else {
-                            self.move_cursor_pos_to_table();
-                        }
-                    }
-                    CursorPos::Dust(pos) => {
-                        let new_pos = pos + 1;
-                        if new_pos < Hand::DICE_NUM {
-                            self.cursor_pos = CursorPos::Dust(new_pos);
-                        } else {
-                            self.move_cursor_pos_to_table();
+                            self.move_cursor_pos_to_table()?;
                         }
                     }
                     _ => (),
@@ -407,18 +521,18 @@ impl App {
             }
 
             Actions::Up => {
-                match self.cursor_pos {
-                    CursorPos::Hand(..) => {
-                        let play = self.get_play_data().unwrap();
-                        if !play.is_held.iter().all(|&x| x) {
-                            self.cursor_pos = CursorPos::Role;
+                match self.state.get_play_cursor_pos()? {
+                    PlayCursorPos::Hand(..) => {
+                        let play = self.state.get_play_data()?;
+                        if !play.get_hand().is_held_all()? {
+                            *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Roll;
                         }
                     }
-                    CursorPos::Dust(pos) => {
-                        self.cursor_pos = CursorPos::Hand(pos);
+                    &PlayCursorPos::Dust(pos) => {
+                        *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Hand(pos);
                     }
-                    CursorPos::Table(..) => {
-                        self.up_action_in_score_table();
+                    PlayCursorPos::Table(..) => {
+                        self.up_action_in_score_table()?;
                     }
                     _ => (),
                 }
@@ -426,15 +540,15 @@ impl App {
             }
 
             Actions::Down => {
-                match self.cursor_pos {
-                    CursorPos::Role => {
-                        self.cursor_pos = CursorPos::Hand(0);
+                match self.state.get_play_cursor_pos()? {
+                    PlayCursorPos::Roll => {
+                        *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Hand(0);
                     }
-                    CursorPos::Hand(pos) => {
-                        self.cursor_pos = CursorPos::Dust(pos);
+                    &PlayCursorPos::Hand(pos) => {
+                        *self.state.get_mut_play_cursor_pos()? = PlayCursorPos::Dust(pos);
                     }
-                    CursorPos::Table(..) => {
-                        self.down_action_in_score_table();
+                    PlayCursorPos::Table(..) => {
+                        self.down_action_in_score_table()?;
                     }
                     _ => (),
                 }
@@ -442,39 +556,39 @@ impl App {
             }
 
             _ => AppReturn::Continue,
-        }
+        })
     }
 
-    fn do_action_in_select(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event.action() {
+    fn do_action_in_select(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => {
-                self.confirm_score_action();
+                self.confirm_score_action()?;
                 AppReturn::Continue
             }
 
             Actions::Up => {
-                self.up_action_in_score_table();
+                self.up_action_in_score_table()?;
                 AppReturn::Continue
             }
 
             Actions::Down => {
-                self.down_action_in_score_table();
+                self.down_action_in_score_table()?;
                 AppReturn::Continue
             }
 
             _ => AppReturn::Continue,
-        }
+        })
     }
 
-    fn do_action_in_result(&mut self, input_event: InputEvent) -> AppReturn {
-        match input_event.action() {
+    fn do_action_in_result(&mut self, input_event: InputEvent) -> Result<AppReturn> {
+        Ok(match input_event.action() {
             Actions::Exit => AppReturn::Exit,
 
             Actions::Select => AppReturn::Exit,
 
             _ => AppReturn::Continue,
-        }
+        })
     }
 }
