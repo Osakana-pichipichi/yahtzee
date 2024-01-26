@@ -100,18 +100,16 @@ elif [[ ${#revs[@]} -eq 0 ]] || \
     fi
 
     echo "commits to check: $before_sha..$head_name"
-    shas=$(git rev-list $before_sha..$head_name) || echo_and_exit 'fail to get commit list'
+    shas=$(git rev-list --reverse $before_sha..$head_name) || echo_and_exit 'fail to get commit list'
 elif [[ ${#revs[@]} -eq 2 ]]; then
     echo "commits to check: ${revs[0]}..${revs[1]}"
-    shas=$(git rev-list ${revs[0]}..${revs[1]}) \
-         || echo_and_exit 'fail to get commit list' $errno_unexpected_input
+    shas=$(git rev-list --reverse ${revs[0]}..${revs[1]}) || \
+         echo_and_exit 'fail to get commit list' $errno_unexpected_input
 else
     echo "commits to check: ${revs[@]}"
-    shas=$(git rev-list ${revs[@]}) || echo_and_exit 'fail to get commit list' $errno_unexpected_input
+    shas=$(git rev-list --reverse ${revs[@]}) || \
+         echo_and_exit 'fail to get commit list' $errno_unexpected_input
 fi
-
-# reverse the list of commit id
-shas=($(echo $shas | tr -s ' ' '\n' | tac))
 
 dirty_test_and_checkout () {
     if [[ $is_dirty_tree = no ]]; then
