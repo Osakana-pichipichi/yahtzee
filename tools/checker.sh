@@ -22,11 +22,11 @@ echo_and_exit () {
 cd $(dirname $(cd $(dirname $0) && pwd))
 
 args=()
-is_raw_commmand=
+is_raw_command=
 while [[ $# != 0 ]]; do
     case $1 in
-        -r | --raw-command ) raw_commmand=yes;;
-        *                  ) args+=($1);;
+        -r | --raw-command ) is_raw_command=yes;;
+        *                  ) args+=("$1");;
     esac
     shift
 done
@@ -36,8 +36,8 @@ if [[ ${#args[@]} -eq 0 ]]; then
 fi
 
 exec_commands=()
-if [[ $raw_command = yes ]]; then
-    exec_commands+=($1)
+if [[ $is_raw_command == yes ]]; then
+    exec_commands+=("${args[0]}")
 else
     cmds=()
     case ${args[0]} in
