@@ -19,7 +19,7 @@ pub enum Actions {
 
 pub enum InputEvent {
     Input(KeyEvent),
-    Resize(u16, u16),
+    Resize,
     Tick,
 }
 
@@ -79,9 +79,7 @@ impl Events {
                 if poll(tick_rate).unwrap() {
                     match read().unwrap() {
                         Event::Key(event) => event_tx.send(InputEvent::Input(event)).unwrap(),
-                        Event::Resize(width, height) => {
-                            event_tx.send(InputEvent::Resize(width, height)).unwrap()
-                        }
+                        Event::Resize(..) => event_tx.send(InputEvent::Resize).unwrap(),
                         _ => (),
                     }
                 } else {
