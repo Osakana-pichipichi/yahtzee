@@ -1,3 +1,5 @@
+// The code of struct Events is based on https://github.com/ilaborie/plop-tui
+
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{
     sync::mpsc::{channel, Receiver, RecvError, Sender},
