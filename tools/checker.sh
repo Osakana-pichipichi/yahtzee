@@ -81,6 +81,7 @@ elif [[ ${#revs[@]} -eq 0 ]] || \
     fi
     head_name=$branch_name
 
+    remote_name=$(git remote show | head -n 1) || echo_and_exit 'fail to get the remote name'
     if [[ -z $branch_name ]]; then
         # get the default branch
         branch_name=$(git remote show $remote_name | grep 'HEAD branch' | awk '{print $NF}') || \
@@ -88,7 +89,6 @@ elif [[ ${#revs[@]} -eq 0 ]] || \
         head_name='HEAD'
     fi
 
-    remote_name=$(git remote show | head -n 1) || echo_and_exit 'fail to get the remote name'
     before_sha=$(git rev-parse $remote_name/$branch_name 2> /dev/null)
     ret=$?
     if [[ $ret -ne 0 ]]; then
