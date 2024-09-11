@@ -73,20 +73,24 @@ if [[ $is_dirty_tree = yes ]]; then
     shas=($current_wd)
 elif [[ ${#revs[@]} -eq 0 ]] || \
      ( [[ ${#revs[@]} -eq 1 ]] && ! [[ ${revs[0]} =~ (.*\.\..*) ]] ); then
-    if [[ ${#revs[@]} -eq 0 ]] || \
-       ( [[ ${#revs[@]} -eq 1 ]] && [[ ${revs[0]} == 'HEAD' ]] ); then
+
+    if [[ ${#revs[@]} -eq 0 ]]; then
+        start_ref='HEAD'
+    else
+        start_ref=${revs[0]}
+    fi
+
+    if [[ $start_ref == 'HEAD' ]]; then
         branch_name=$(git branch --show-current)
     else
-        branch_name=${revs[0]}
+        branch_name=$(git branch -a --format="%(refname:short)" | grep -P "^$start_ref$")
     fi
-    head_name=$branch_name
 
     remote_name=$(git remote show | head -n 1) || echo_and_exit 'fail to get the remote name'
     if [[ -z $branch_name ]]; then
         # get the default branch
         branch_name=$(git remote show $remote_name | grep 'HEAD branch' | awk '{print $NF}') || \
                     echo_and_exit 'fail to get the default branch'
-        head_name='HEAD'
     fi
 
     before_sha=$(git rev-parse $remote_name/$branch_name 2> /dev/null)
@@ -99,8 +103,8 @@ elif [[ ${#revs[@]} -eq 0 ]] || \
                    echo_and_exit 'fail to get start point sha'
     fi
 
-    echo "commits to check: $before_sha..$head_name"
-    shas=$(git rev-list --reverse $before_sha..$head_name) || echo_and_exit 'fail to get commit list'
+    echo "commits to check: $before_sha..$start_ref"
+    shas=$(git rev-list --reverse $before_sha..$start_ref) || echo_and_exit 'fail to get commit list'
 elif [[ ${#revs[@]} -eq 2 ]]; then
     echo "commits to check: ${revs[0]}..${revs[1]}"
     shas=$(git rev-list --reverse ${revs[0]}..${revs[1]}) || \
