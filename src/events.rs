@@ -1,4 +1,7 @@
 // The code of struct Events is based on https://github.com/ilaborie/plop-tui
+//
+// license:
+// https://github.com/ilaborie/plop-tui/blob/523c8da5f60b4559d90e65fe14c817e012f62c6a/LICENSE-MIT
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{
